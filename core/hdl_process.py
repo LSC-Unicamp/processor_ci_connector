@@ -1,11 +1,15 @@
 import os
 import subprocess
+import logging
 from core import BUILD_DIR, INTERNAL_DIR
+
+
+logger = logging.getLogger(__name__)
 
 
 def run_ghdl_import(cpu_name, vhdl_files):
     """Importar todos os arquivos VHDL com GHDL -i."""
-    print('[INFO] Importando arquivos VHDL com GHDL (-i)...')
+    logger.info('Importando arquivos VHDL com GHDL (-i)...')
     cmd = [
         'ghdl',
         '-i',
@@ -14,13 +18,13 @@ def run_ghdl_import(cpu_name, vhdl_files):
         f'--workdir={BUILD_DIR}',
         f'-P{BUILD_DIR}',
     ] + list(map(str, vhdl_files))
-    print(f"[CMD] {' '.join(cmd)}")
+    logger.info(f"[CMD] {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
 
 
 def run_ghdl_elaborate(cpu_name, top_module):
     """Elaborar com GHDL -m."""
-    print('[INFO] Elaborando projeto com GHDL (-m)...')
+    logger.info('Elaborando projeto com GHDL (-m)...')
     cmd = [
         'ghdl',
         '-m',
@@ -30,13 +34,13 @@ def run_ghdl_elaborate(cpu_name, top_module):
         f'-P{BUILD_DIR}',
         f'{top_module}',
     ]
-    print(f"[CMD] {' '.join(cmd)}")
+    logger.info(f"[CMD] {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
 
 
 def synthesize_to_verilog(cpu_name, output_file, top_module):
     """Sintetizar o VHDL com GHDL para Verilog."""
-    print(f'[INFO] Sintetizando {cpu_name} para Verilog...')
+    logger.info(f'Sintetizando {cpu_name} para Verilog...')
     cmd = [
         'ghdl',
         'synth',
@@ -48,7 +52,7 @@ def synthesize_to_verilog(cpu_name, output_file, top_module):
         '--out=verilog',
         top_module,
     ]
-    print(f"[CMD] {' '.join(cmd)} > {output_file}")
+    logger.info(f"[CMD] {' '.join(cmd)} > {output_file}")
     with open(output_file, 'w') as f:
         subprocess.run(cmd, stdout=f, check=True)
 
@@ -75,15 +79,18 @@ def process_verilog(
     for file_rel in files:
         src_file = os.path.join(processor_path, file_rel)
         if not os.path.exists(src_file):
-            print(f'[AVISO] Arquivo não encontrado: {src_file}')
+            logger.warning(f'Arquivo não encontrado: {src_file}')
             continue
         if file_rel.strip().split('.')[-1].lower() in ['vhdl', 'vhd']:
             vhdl_files.append(str(src_file))
         else:
             other_files.append(str(src_file))
 
-
     if vhdl_files:
+        logger.info('Arquivos VHDL encontrados:')
+        for vhdl_file in vhdl_files:
+            logger.debug(f' - {vhdl_file}')
+        logger.info('Convertendo VHDL para Verilog...')
         os.makedirs(BUILD_DIR, exist_ok=True)
         verilog_output = os.path.join(BUILD_DIR, f'{cpu_name}.v')
         convert_to_verilog(
@@ -101,7 +108,9 @@ def process_verilog(
         if os.path.exists(inc_path):
             include_flags.append(f'-I{inc_path}')
         else:
-            print(f'[AVISO] Diretório de include não encontrado: {inc_path}')
+            logger.warning(f'Diretório de include não encontrado: {inc_path}')
+
+    logger.info("Pré-processando arquivos Verilog com Verilator...")
 
     verilator_preprocess_cmd = [
         'verilator',
@@ -127,6 +136,10 @@ def process_verilog(
         verilator_preprocess_cmd, capture_output=True, text=True
     )
     lines = proc.stdout.splitlines()
+
+    logging.debug(f'Comando Verilator: {" ".join(verilator_preprocess_cmd)}')
+
+    logging.info('Filtrando cabeçalho do módulo superior...')
 
     header_lines = []
     inside_module = False
@@ -155,6 +168,8 @@ def process_verilog(
         if line.strip() != '' and not line.startswith('`line')
     )
 
+    logging.info('Salvando código Verilog processado...')
+
     output_path = os.path.join(BUILD_DIR, f'{cpu_name}_processed.sv')
 
     # Salva o resultado em um único arquivo
@@ -169,10 +184,12 @@ def process_verilog(
 def simulate_to_check(
     cpu_name: str, files_list: list[str], include_flags: list[str]
 ):
+    logging.info('Compilando e executando simulação com Verilator...')
+
     current_dir = os.getcwd()
 
-    top_module_file = f'{cpu_name}.sv'
-    
+    top_module_file = f'output/{cpu_name}.sv'
+
     top_module_file = os.path.join(current_dir, top_module_file)
 
     files_list.append(str(top_module_file))
@@ -212,12 +229,12 @@ def simulate_to_check(
         '-std=c++17',
     ]
 
-    print(f"[CMD] {' '.join(verilator_cmd)}")
+    logger.info(f"[CMD] {' '.join(verilator_cmd)}")
     subprocess.run(verilator_cmd, check=True, cwd=BUILD_DIR)
 
     sim_executable = os.path.join(BUILD_DIR, 'build', 'Vverification_top')
     if os.path.exists(sim_executable):
-        print('[INFO] Executando simulação...')
+        logger.info('Executando simulação...')
         subprocess.run([str(sim_executable)], check=True)
     else:
-        print('[ERRO] Executável de simulação não encontrado.')
+        logger.error('Executável de simulação não encontrado.')

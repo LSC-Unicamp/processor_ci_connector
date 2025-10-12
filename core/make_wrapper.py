@@ -1,5 +1,6 @@
 import os
 import re
+import logging
 from core import TEMPLATES_DIR
 from jinja2 import Environment, FileSystemLoader
 from core.bus_defines import (
@@ -13,6 +14,7 @@ from core.bus_defines import (
     avalon_data_adapter,
 )
 
+logger = logging.getLogger(__name__)
 
 def _split_top_level_commas(s: str):
     """Divide por vírgulas de nível superior (ignora vírgulas dentro de colchetes/parênteses/strings)."""
@@ -21,22 +23,44 @@ def _split_top_level_commas(s: str):
     in_squote = in_dquote = esc = False
     for ch in s:
         if esc:
-            cur.append(ch); esc = False; continue
+            cur.append(ch)
+            esc = False
+            continue
         if ch == '\\':
-            cur.append(ch); esc = True; continue
+            cur.append(ch)
+            esc = True
+            continue
         if ch == "'" and not in_dquote:
-            in_squote = not in_squote; cur.append(ch); continue
+            in_squote = not in_squote
+            cur.append(ch)
+            continue
         if ch == '"' and not in_squote:
-            in_dquote = not in_dquote; cur.append(ch); continue
+            in_dquote = not in_dquote
+            cur.append(ch)
+            continue
         if in_squote or in_dquote:
-            cur.append(ch); continue
-        if ch == '[': depth_brack += 1; cur.append(ch); continue
-        if ch == ']': depth_brack = max(0, depth_brack-1); cur.append(ch); continue
-        if ch == '(': depth_paren += 1; cur.append(ch); continue
-        if ch == ')': depth_paren = max(0, depth_paren-1); cur.append(ch); continue
+            cur.append(ch)
+            continue
+        if ch == '[':
+            depth_brack += 1
+            cur.append(ch)
+            continue
+        if ch == ']':
+            depth_brack = max(0, depth_brack - 1)
+            cur.append(ch)
+            continue
+        if ch == '(':
+            depth_paren += 1
+            cur.append(ch)
+            continue
+        if ch == ')':
+            depth_paren = max(0, depth_paren - 1)
+            cur.append(ch)
+            continue
         if ch == ',' and depth_brack == 0 and depth_paren == 0:
             part = ''.join(cur).strip()
-            if part: parts.append(part)
+            if part:
+                parts.append(part)
             cur = []
             continue
         cur.append(ch)
@@ -61,9 +85,9 @@ def generate_instance(code: str, mapping: dict, instance_name='u_instancia'):
 
     # localizar module <name> #( ... )? ( ... ) ;
     header_pat = re.compile(
-        r'\bmodule\s+([A-Za-z_]\w*)'                # module name
-        r'(?:\s*#\s*\((?P<params>.*?)\)\s*)?'       # optional params block
-        r'\(\s*(?P<ports>.*?)\s*\)\s*;',            # ports block up to the terminating ');'
+        r'\bmodule\s+([A-Za-z_]\w*)'  # module name
+        r'(?:\s*#\s*\((?P<params>.*?)\)\s*)?'  # optional params block
+        r'\(\s*(?P<ports>.*?)\s*\)\s*;',  # ports block up to the terminating ');'
         re.DOTALL,
     )
     m = header_pat.search(code)
@@ -94,8 +118,16 @@ def generate_instance(code: str, mapping: dict, instance_name='u_instancia'):
     current_dir = None
 
     type_words = {
-        'reg', 'wire', 'logic', 'signed', 'unsigned', 'integer',
-        'bit', 'byte', 'int', 'shortint'
+        'reg',
+        'wire',
+        'logic',
+        'signed',
+        'unsigned',
+        'integer',
+        'bit',
+        'byte',
+        'int',
+        'shortint',
     }
 
     for chunk in chunks:
@@ -169,11 +201,11 @@ def generate_instance(code: str, mapping: dict, instance_name='u_instancia'):
         elif direction == 'input':
             pl = port.lower()
             if 'dbg_' in pl or 'trace_' in pl:
-                conn = "1'b0"
+                conn = '0'
             elif pl.endswith('_en') or pl.endswith('_valid'):
-                conn = "1'b1"
+                conn = '1'
             else:
-                conn = "1'b0"
+                conn = '0'
         else:
             conn = ''  # outputs/inout -> vazio
 
@@ -187,8 +219,6 @@ def generate_instance(code: str, mapping: dict, instance_name='u_instancia'):
     lines.append(');')
 
     return '\n'.join(lines)
-
-
 
 
 def generate_wrapper(

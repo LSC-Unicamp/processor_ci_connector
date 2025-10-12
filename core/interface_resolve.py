@@ -1,6 +1,7 @@
 import re
 import ast
 import json
+import logging
 from core import send_prompt
 from core.prompts import (
     wishbone_prompt,
@@ -9,6 +10,7 @@ from core.prompts import (
     find_interface_prompt,
 )
 
+logger = logging.getLogger(__name__)
 
 def filter_connections_from_response(response):
     def clean_json_block(block: str):
@@ -25,7 +27,7 @@ def filter_connections_from_response(response):
     )
 
     if not connections_match:
-        print('Could not find Connections in the response.')
+        logger.warning('Could not find Connections in the response.')
         return None
 
     connections_str = clean_json_block(connections_match.group(1))
@@ -35,7 +37,7 @@ def filter_connections_from_response(response):
     return connections
 
 
-def connect_interfaces(interface_info, processor_interface):
+def connect_interfaces(interface_info, processor_interface, model='qwen2.5:32b'):
     if interface_info['bus_type'] == 'Wishbone':
         prompt = wishbone_prompt.format(
             processor_interface=processor_interface,
@@ -52,19 +54,20 @@ def connect_interfaces(interface_info, processor_interface):
             memory_interface=interface_info['memory_interface'],
         )
     else:
-        print('Defaulting to Wishbone.')
+        logger.warning('Defaulting to Wishbone.')
         prompt = wishbone_prompt.format(
             processor_interface=processor_interface,
             memory_interface=interface_info['memory_interface'],
         )
 
-    success, response = send_prompt(prompt)
+    logger.info(f"Consultando modelo {model} para conexões de interface...")
 
+    success, response = send_prompt(prompt, model=model)
 
-    print("Ollama response for connect: ")
-    print(response, end="\n\n\n")
+    logger.debug(f'Ollama response for connection: \n{response}\n\n')
+
     if not success:
-        print('Error communicating with the server.')
+        logger.error('Error communicating with the server.')
         return None, None
 
     connections = filter_connections_from_response(response)
@@ -99,18 +102,18 @@ def filter_processor_interface_from_response(response: str) -> str:
         r'//.*$', '', candidate, flags=re.MULTILINE
     )  # remove JavaScript-style comments
 
-
     # --- 3. Try parsing ---
     try:
         parsed = json.loads(candidate)
+        logger.debug(f'Successfully parsed with json.loads: {parsed}')
     except json.JSONDecodeError:
+        logger.warning('Failed to parse JSON with json.loads, trying ast.literal_eval...')
         try:
             # fallback: try Python dict style with ast.literal_eval
             parsed = ast.literal_eval(candidate)
+            logger.debug(f'Successfully parsed with ast.literal_eval: {parsed}')
         except (ValueError, SyntaxError):
-            #raise ValueError(
-            #    f'Failed to parse JSON from response: {candidate}'
-            #)
+            logger.error(f'Failed to parse JSON from response: {candidate}')
             return False, {}
 
     # --- 4. Keep only expected keys ---
@@ -123,15 +126,16 @@ def filter_processor_interface_from_response(response: str) -> str:
 def extract_interface_and_memory_ports(core_declaration, model='qwen2.5:32b'):
 
     prompt = find_interface_prompt.format(core_declaration=core_declaration)
+
+    logger.info(f"Consultando modelo {model} para identificar a interface do processador...")
+
     success, response = send_prompt(prompt, model=model)
 
-
-    print("Ollama response: ")
-    print(response, end="\n\n\n")
+    logger.debug(f'Ollama response for interface extraction: \n{response}\n\n')
 
     if not success:
-        print('Error communicating with the server.')
+        logger.error('Error communicating with the server.')
         return None
 
-    json_info = filter_processor_interface_from_response(response)
-    return json_info
+    ok, json_info = filter_processor_interface_from_response(response)
+    return ok, json_info

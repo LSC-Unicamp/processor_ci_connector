@@ -1,6 +1,8 @@
 import os
 import sys
 import json
+import colorlog
+import logging
 import argparse
 from core.hdl_process import process_verilog, simulate_to_check
 from core.interface_resolve import (
@@ -53,8 +55,34 @@ def main() -> None:
         required=True,
         help='Path to the processor source code',
     )
+    parser.add_argument(
+        '-v', '--verbose', action='store_true', help='Exibe logs detalhados'
+    )
 
     args = parser.parse_args()
+
+    handler = colorlog.StreamHandler()
+    formatter = colorlog.ColoredFormatter(
+        "%(log_color)s%(asctime)s [%(name)s] %(levelname)s:%(reset)s %(message)s",
+        datefmt="%H:%M:%S",
+        log_colors={
+            'DEBUG': 'cyan',
+            'INFO': 'green',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'bold_red,bg_white',
+        }
+    )
+    handler.setFormatter(formatter)
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        handlers=[handler]
+    )
+
+    logging.debug("Modo detalhado ativado" if args.verbose else "Modo normal")
+
+    logging.info('Lendo configuração do processador...')
 
     config_path = os.path.join(args.config, f'{args.processor}.json')
     config_data = {}
@@ -65,6 +93,8 @@ def main() -> None:
     include_dirs = config_data.get('include_dirs', [])
     top_module = config_data.get('top_module', args.processor)
 
+    logging.info('Processando código HDL...')
+
     header, other_files, include_flags = process_verilog(
         args.processor,
         top_module,
@@ -74,27 +104,37 @@ def main() -> None:
         context=args.context,
     )
 
+    logging.debug(f'Cabeçalho extraído:\n{header}')
+
     interface_and_ports = None
+
+    logging.info('Extraindo interfaces e portas de memória...')
 
     ok = False
     tentativas = 0
     # Tenta 3 vezes obter um json valido
     while not ok and tentativas < 3:
         tentativas += 1
+        logging.debug(f'Tentativa {tentativas} de 3...')
         ok, interface_and_ports = extract_interface_and_memory_ports(
             header, args.model
         )
-    
+
     if tentativas == 3 and not ok:
-        print("Erro ao parsear json")
+        logging.error('Erro ao parsear json')
         sys.exit(1)
-        
 
-    connections = connect_interfaces(interface_and_ports, header)
+    logging.debug(f'Interface detectada: {interface_and_ports}')
 
-    instance = generate_instance(header, connections, "Processor")
+    logging.info('Conectando interfaces...')
 
-    print(f"Generated instance: \n{instance}")
+    connections = connect_interfaces(interface_and_ports, header, args.model)
+
+    logging.debug(f'\nConexões detectadas: {connections}\n\n')
+
+    instance = generate_instance(header, connections, 'Processor')
+
+    logging.info('Gerando wrapper...')
 
     generate_wrapper(
         args.processor,
@@ -102,6 +142,8 @@ def main() -> None:
         interface_and_ports['bus_type'],
         interface_and_ports.get('memory_interface', '') == 'Dual',
     )
+
+    logging.info('Iniciando simulação para verificação...')
 
     simulate_to_check(args.processor, other_files, include_flags)
 
