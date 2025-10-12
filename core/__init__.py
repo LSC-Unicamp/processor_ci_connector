@@ -5,8 +5,8 @@ import subprocess
 from core.bus_defines import PROTOCOLS
 from ollama import Client
 
-# SERVER_URL = "http://enqii.lsc.ic.unicamp.br:11434"
-SERVER_URL = 'http://127.0.0.1:11434'
+SERVER_URL = "http://enqii.lsc.ic.unicamp.br:11434"
+# SERVER_URL = 'http://127.0.0.1:11434'
 client = Client(host=SERVER_URL)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

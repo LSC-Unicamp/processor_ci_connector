@@ -15,7 +15,7 @@ Steps:
 5. Determine whether the processor exposes:
    - A single unified memory interface (shared instruction and data access).
    - Two separate memory interfaces (one for instruction fetch, one for data).
-   Look for clues such as signal names containing "instr", "imem", "fetch", "idata" for instructions, and "data", "dmem", "store", "load" for data.
+   Look for clues such as signal names containing "instr", "pc", "imem", "fetch", "idata" for instructions, and "data", "dmem", "store", "load" for data.
 7. Validate signals against the true semantics of each bus standard before assigning confidence:
    - Both the name and the function must match (timing, purpose, driver). 
    - Check that the signal’s bit-width and input/output direction are consistent with the bus specification.
@@ -23,15 +23,10 @@ Steps:
    - For Avalon interfaces, prefer mappings where separate `read` and `write` signals exist.
 8. Decide which bus type(s) the module most closely matches.
 9. If fewer than 70% of the required signals of any bus match, classify as "Custom" with Low confidence. 
-10. Assign confidence as follows (after validation):
-   - High: >=90% of required signals matched, and this bus has at least 2 more matches than the next closest bus.
-   - Medium: >=90% of required signals matched, but another bus type is close (within +/- 1 match).
-   - Low: >=70% of required signals matched
-Provide your reasoning first (step-by-step analysis following Steps 1–10), and then give the final structured result in the required JSON format:
+Provide your reasoning first (step-by-step analysis following Steps 1–9), and then give the final structured result in the required JSON format:
 {{
   "bus_type": One of [AHB, AXI, Avalon, Wishbone, Custom]
   "memory_interface": Single or Dual
-  "confidence": High/Medium/Low (based on number of matches and comments)
 }}
 
 Dictionary of bus signals:
@@ -75,8 +70,11 @@ wishbone_prompt = """You are a hardware engineer. Your task is to connect a proc
 Your task has two parts:
 
 ---
+**Part 1: Indentify dual memory interfaces**
+- Identify which interface is the instruction interface and which is the data interface.
+- Use the name of the signals to perform this. Look for keywords such as "instr", "pc", "data".
 
-**Part 1: Map signals to the wrapper**
+**Part 2: Map signals to the wrapper**
 
 - Create a JSON where the key is the wrapper signal and the value is the processor signal or an expression to generate it.
 - Use comments in the code if they mention the interface (e.g. "AHB master port")

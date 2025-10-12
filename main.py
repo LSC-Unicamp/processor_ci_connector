@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import argparse
 from core.hdl_process import process_verilog, simulate_to_check
@@ -75,18 +76,23 @@ def main() -> None:
 
     interface_and_ports = None
 
-    confidence = False
+    ok = False
     tentativas = 0
-    while not confidence and tentativas < 3:
+    # Tenta 3 vezes obter um json valido
+    while not ok and tentativas < 3:
         tentativas += 1
-        interface_and_ports = extract_interface_and_memory_ports(
+        ok, interface_and_ports = extract_interface_and_memory_ports(
             header, args.model
         )
-        confidence = interface_and_ports.get('confidence', '') == 'High'
+    
+    if tentativas == 3 and not ok:
+        print("Erro ao parsear json")
+        sys.exit(1)
+        
 
     connections = connect_interfaces(interface_and_ports, header)
 
-    instance = generate_instance(header, connections)
+    instance = generate_instance(header, connections, "Processor")
 
     print(f"Generated instance: \n{instance}")
 

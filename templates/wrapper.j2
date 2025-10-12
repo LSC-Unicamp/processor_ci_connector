@@ -54,7 +54,7 @@ module processorci_top (
 
     `endif
 );
-logic clk_core, rst_core, rst_n;
+logic clk_core, rst_core;
 `ifdef SIMULATION
 assign clk_core = sys_clk;
 assign rst_core = ~rst_n;

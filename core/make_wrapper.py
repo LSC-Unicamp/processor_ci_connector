@@ -224,7 +224,9 @@ def generate_wrapper(
         }
     )
 
-    output_path = f'{cpu_name}.sv'
+    os.makedirs('outputs', exist_ok=True)
+
+    output_path = f'outputs/{cpu_name}.sv'
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(output)

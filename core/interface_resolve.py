@@ -59,6 +59,10 @@ def connect_interfaces(interface_info, processor_interface):
         )
 
     success, response = send_prompt(prompt)
+
+
+    print("Ollama response for connect: ")
+    print(response, end="\n\n\n")
     if not success:
         print('Error communicating with the server.')
         return None, None
@@ -73,7 +77,6 @@ def filter_processor_interface_from_response(response: str) -> str:
     {
         "bus_type": One of [AHB, AXI, Avalon, Wishbone, Custom],
         "memory_interface": Single or Dual,
-        "confidence": High/Medium/Low (based on number of matches and comments)
     }
     This function extracts and returns only the JSON part of the response.
     """
@@ -96,6 +99,7 @@ def filter_processor_interface_from_response(response: str) -> str:
         r'//.*$', '', candidate, flags=re.MULTILINE
     )  # remove JavaScript-style comments
 
+
     # --- 3. Try parsing ---
     try:
         parsed = json.loads(candidate)
@@ -104,21 +108,26 @@ def filter_processor_interface_from_response(response: str) -> str:
             # fallback: try Python dict style with ast.literal_eval
             parsed = ast.literal_eval(candidate)
         except (ValueError, SyntaxError):
-            raise ValueError(
-                f'Failed to parse JSON from response: {candidate}'
-            )
+            #raise ValueError(
+            #    f'Failed to parse JSON from response: {candidate}'
+            #)
+            return False, {}
 
     # --- 4. Keep only expected keys ---
-    allowed_keys = {'bus_type', 'memory_interface', 'confidence'}
+    allowed_keys = {'bus_type', 'memory_interface'}
     filtered = {k: parsed[k] for k in allowed_keys if k in parsed}
 
-    return filtered
+    return True, filtered
 
 
 def extract_interface_and_memory_ports(core_declaration, model='qwen2.5:32b'):
 
     prompt = find_interface_prompt.format(core_declaration=core_declaration)
     success, response = send_prompt(prompt, model=model)
+
+
+    print("Ollama response: ")
+    print(response, end="\n\n\n")
 
     if not success:
         print('Error communicating with the server.')

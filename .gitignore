@@ -208,3 +208,8 @@ execution_trace.txt
 blink2/
 demo/
 obj_dir/
+
+#Processors
+
+Grande-Risco-5.sv
+tinyriscv.sv
