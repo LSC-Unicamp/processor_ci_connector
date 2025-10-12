@@ -58,6 +58,9 @@ def main() -> None:
     parser.add_argument(
         '-v', '--verbose', action='store_true', help='Exibe logs detalhados'
     )
+    parser.add_argument(
+        '-o', '--output', type=str, default='outputs', help='Output directory'
+    )
 
     args = parser.parse_args()
 
@@ -128,9 +131,18 @@ def main() -> None:
 
     logging.info('Conectando interfaces...')
 
-    connections = connect_interfaces(interface_and_ports, header, args.model)
+    tentativas = 0
+    connections = None
 
-    logging.debug(f'\nConexões detectadas: {connections}\n\n')
+    while connections is None and tentativas < 3:
+        tentativas += 1
+        logging.debug(f'Tentativa {tentativas} de 3...')
+        connections = connect_interfaces(interface_and_ports, header, args.model)
+
+    if tentativas == 3 and connections is None:
+            logging.error('Erro ao parsear json')
+            sys.exit(1)
+
 
     instance = generate_instance(header, connections, 'Processor')
 
@@ -141,11 +153,12 @@ def main() -> None:
         instance,
         interface_and_ports['bus_type'],
         interface_and_ports.get('memory_interface', '') == 'Dual',
+        args.output
     )
 
     logging.info('Iniciando simulação para verificação...')
 
-    simulate_to_check(args.processor, other_files, include_flags)
+    simulate_to_check(args.processor, other_files, include_flags, args.output)
 
 
 if __name__ == '__main__':

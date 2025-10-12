@@ -122,6 +122,7 @@ def process_verilog(
         '-DSYNTH',
         '-DEN_EXCEPT',
         '-DEN_RVZICSR',
+        "--quiet",
         '-Wall',
         '-Wno-UNOPTFLAT',
         '-Wno-IMPLICIT',
@@ -182,13 +183,13 @@ def process_verilog(
 
 
 def simulate_to_check(
-    cpu_name: str, files_list: list[str], include_flags: list[str]
+    cpu_name: str, files_list: list[str], include_flags: list[str], output_dir: str = 'outputs'
 ):
     logging.info('Compilando e executando simulação com Verilator...')
 
     current_dir = os.getcwd()
 
-    top_module_file = f'output/{cpu_name}.sv'
+    top_module_file = f'{output_dir}/{cpu_name}.sv'
 
     top_module_file = os.path.join(current_dir, top_module_file)
 
@@ -220,6 +221,7 @@ def simulate_to_check(
         '-Wno-UNUSED',
         '--top-module',
         'verification_top',
+        "--quiet",
         '--Mdir',
         'build',
         os.path.join(INTERNAL_DIR, 'soc_main.cpp'),

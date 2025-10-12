@@ -27,6 +27,9 @@ def filter_connections_from_response(response):
     )
 
     if not connections_match:
+        connections_match = re.search(r'({\s*".*?}\s*)', response, re.DOTALL)
+
+    if not connections_match:
         logger.warning('Could not find Connections in the response.')
         return None
 

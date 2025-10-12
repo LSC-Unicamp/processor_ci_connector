@@ -222,7 +222,7 @@ def generate_instance(code: str, mapping: dict, instance_name='u_instancia'):
 
 
 def generate_wrapper(
-    cpu_name: str, instance_code: str, bus_type: str, second_memory: bool
+    cpu_name: str, instance_code: str, bus_type: str, second_memory: bool, output_dir='outputs'
 ):
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     template = env.get_template('wrapper.j2')
@@ -255,9 +255,9 @@ def generate_wrapper(
         }
     )
 
-    os.makedirs('outputs', exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
 
-    output_path = f'outputs/{cpu_name}.sv'
+    output_path = f'{output_dir}/{cpu_name}.sv'
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(output)

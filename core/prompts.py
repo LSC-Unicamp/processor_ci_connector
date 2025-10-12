@@ -84,6 +84,7 @@ Your task has two parts:
         "optional": ["sel", "err", "rty", "stall"]
     }}
 - Allow for alternate names (e.g. "rw_address" ~= "adr", "write_request" ~= "write")
+- If needed, generate expressions to invert signals (e.g., "!rst_core" for "rst_n")
 - If needed, generate expressions to convert signals (e.g., `"core_we": "wstrb != 0"`, `"core_stb & core_cyc": "read_request | write_request"`)
 - If the sel signal is missing, complete it with "4'b1111".
 - If an input signal is missing (e.g. ack) leave it open using `null`
@@ -93,8 +94,8 @@ Your task has two parts:
 
 Example JSON format:
 {{
-  "sys_clk": "clk",
-  "!rst_n": "rst",
+  "clk_core": "clk",
+  "!rst_core": "rst_n",
   "core_cyc": "cyc_o",
   "core_stb": "stb_o",
   "core_we": "we_o",
@@ -155,6 +156,12 @@ module processorci_top (
 
     `endif
 );
+
+logic clk_core, rst_core;
+`ifdef SIMULATION
+assign clk_core = sys_clk;
+assign rst_core = ~rst_n;
+`else
 
 Processor interface:
 
@@ -273,7 +280,7 @@ You must first give your reasoning and then output the json in this format:
 ```
 Connections:
 {{
-    "sys_clk" : "clk",
+    "clk_core" : "clk",
     ...
 }}
 ```
@@ -314,15 +321,15 @@ Your task has two parts:
 
 Example format:
 {{
-  "sys_clk": "clk",
-  "rst_n": "reset_n",
+  "clk_core": "clk",
+  "!rst_core": "reset_n",
   "awaddr": "s_awaddr",
   ...
 }}
 or
 {{
-  "sys_clk": "HCLK",
-  "rst_n": "HRESETn",
+  "clk_core": "HCLK",
+  "!rst_core": "HRESETn",
   "adapter_instr_awaddr": "instr_mem_awaddr",
   "adapter_data_awaddr": "data_mem_awaddr",
   ...
@@ -390,7 +397,7 @@ You must first give your reasoning and then output the json in this format:
 ```
 Connections:
 {{
-    "sys_clk" : "clk",
+    "clk_core" : "clk",
     ...
 }}
 ```
