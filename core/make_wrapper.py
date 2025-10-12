@@ -1,3 +1,4 @@
+import os
 import re
 from core import TEMPLATES_DIR
 from jinja2 import Environment, FileSystemLoader

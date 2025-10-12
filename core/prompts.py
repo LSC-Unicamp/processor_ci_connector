@@ -10,20 +10,19 @@ You are provided:
 Steps:
 1. Compare the module’s signals against the dictionary of required/optional signals.
 2. Allow for alternate names (e.g. "rw_address" ~= "adr", "write_request" ~= "write").
-3. Allow read-only memory interfaces (e.g., instruction fetch ports) to omit write-related signals (`we`, `writedata`) without being classified as Custom.
-4. Use comments in the code if they mention the interface (e.g. "AHB master port").
-5. Determine whether the processor exposes:
+3. Use comments in the code if they mention the interface (e.g. "AHB master port").
+4. Determine whether the processor exposes:
    - A single unified memory interface (shared instruction and data access).
    - Two separate memory interfaces (one for instruction fetch, one for data).
    Look for clues such as signal names containing "instr", "pc", "imem", "fetch", "idata" for instructions, and "data", "dmem", "store", "load" for data.
-7. Validate signals against the true semantics of each bus standard before assigning confidence:
+5. Validate signals against the true semantics of each bus standard before assigning confidence:
    - Both the name and the function must match (timing, purpose, driver). 
    - Check that the signal’s bit-width and input/output direction are consistent with the bus specification.
    - Treat `cyc` and `stb` signals from a Wishbone interface as potentially merged into a single signal (e.g., read_request can represent cyc & stb).
    - For Avalon interfaces, prefer mappings where separate `read` and `write` signals exist.
-8. Decide which bus type(s) the module most closely matches.
-9. If fewer than 70% of the required signals of any bus match, classify as "Custom" with Low confidence. 
-Provide your reasoning first (step-by-step analysis following Steps 1–9), and then give the final structured result in the required JSON format:
+6. Decide which bus type(s) the module most closely matches.
+7. If fewer than 70% of the required signals of any bus match, classify as "Custom" with Low confidence. 
+Provide your reasoning first (step-by-step analysis following Steps 1–7), and then give the final structured result in the required JSON format:
 {{
   "bus_type": One of [AHB, AXI, Avalon, Wishbone, Custom]
   "memory_interface": Single or Dual
@@ -76,10 +75,8 @@ Your task has two parts:
 
 **Part 2: Map signals to the wrapper**
 
-- Create a JSON where the key is the wrapper signal and the value is the processor signal or an expression to generate it.
 - Use comments in the code if they mention the interface (e.g. "AHB master port")
 - Match inputs to inputs and outputs to outputs.
-- Both the name and the function must match (timing, purpose, driver).
 - Connect signals with the same bit width.
 - Use the Wishbone mapping:
     "Wishbone": {{
@@ -88,16 +85,16 @@ Your task has two parts:
     }}
 - Allow for alternate names (e.g. "rw_address" ~= "adr", "write_request" ~= "write")
 - If needed, generate expressions to convert signals (e.g., `"core_we": "wstrb != 0"`, `"core_stb & core_cyc": "read_request | write_request"`)
-- If the sel signal is missing, complete it with "4'b1111" or the equivalent in VHDL.
+- If the sel signal is missing, complete it with "4'b1111".
 - If an input signal is missing (e.g. ack) leave it open using `null`
 - Check the reset signal polarity (rst or rst_n) and invert if needed.
 - Treat `cyc` and `stb` signals from a Wishbone interface as potentially merged into a single signal (e.g., read_request can represent cyc & stb). 
-- If there is only a single memory interface, leave dual-memory signals (data_mem_*) unconnected (use `null`).
+- Use the results of part 1 to fill the memory interfaces. In case of single interface, leave data-memory signals (data_mem_*) unconnected (use `null`).
 
-Example format:
+Example JSON format:
 {{
   "sys_clk": "clk",
-  "rst_n": "rst_n",
+  "!rst_n": "rst",
   "core_cyc": "cyc_o",
   "core_stb": "stb_o",
   "core_we": "we_o",
