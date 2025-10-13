@@ -84,18 +84,15 @@ Your task has two parts:
         "optional": ["sel", "err", "rty", "stall"]
     }}
 - Allow for alternate names (e.g. "rw_address" ~= "adr", "write_request" ~= "write")
-- If needed, generate expressions to invert signals (e.g., "!rst_core" for "rst_n")
 - If needed, generate expressions to convert signals (e.g., `"core_we": "wstrb != 0"`, `"core_stb & core_cyc": "read_request | write_request"`)
 - If the sel signal is missing, complete it with "4'b1111".
 - If an input signal is missing (e.g. ack) leave it open using `null`
-- Check the reset signal polarity (rst or rst_n) and invert if needed.
 - Treat `cyc` and `stb` signals from a Wishbone interface as potentially merged into a single signal (e.g., read_request can represent cyc & stb). 
 - Use the results of part 1 to fill the memory interfaces. In case of single interface, leave data-memory signals (data_mem_*) unconnected (use `null`).
+- Associate instruction bus signals to `core_*` and data bus signals to `data_mem_*` (if dual memory interface), use the part 1 results.
 
 Example JSON format:
 {{
-  "clk_core": "clk",
-  "!rst_core": "rst_n",
   "core_cyc": "cyc_o",
   "core_stb": "stb_o",
   "core_we": "we_o",
@@ -216,18 +213,36 @@ Your task has two parts:
 
 Example format:
 {{
-  "sys_clk": "HCLK",
-  "rst_n": "HRESETn",
+  "haddr": "HADDR",
+  "hwrite": "HWRITE",
   "htrans": "HTRANS",
+  "hsize": "HSIZE",
+  "hburst": "HBURST",
+  "hprot": "HPROT",
+  "hmastlock": "HMASTLOCK",
+  "hexcl": "HEXCL",
+  "hready": "HREADY",
+  "hresp": "HRESP",
+  "hexokay": "HEXOKAY",
+  "hwdata": "HWDATA",
+  "hrdata": "HRDATA",
   ...
 }}
 or
 {{
-  "sys_clk": "HCLK",
-  "rst_n": "HRESETn",
-  "adapter_instr_htrans": "INSTR_HTRANS",
-  "adapter_data_htrans": "DATA_HTRANS",
-  ...
+  "haddr": "haddr",
+  "htrans": "htrans",
+  "hwrite": "hwrite",
+  "hsize": "hsize",
+  "hburst": "hburst",
+  "hprot": "hprot",
+  "hmastlock": "hlock",
+  "hwdata": "hwdata",
+  "hready": "hready",
+  "hrdata": "hrdata",
+  "hreadyout": "hreadyout",
+  "hresp": "hresp",
+    ...
 }}
 
 ---

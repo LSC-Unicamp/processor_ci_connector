@@ -16,6 +16,7 @@ from core.bus_defines import (
 
 logger = logging.getLogger(__name__)
 
+
 def _split_top_level_commas(s: str):
     """Divide por vírgulas de nível superior (ignora vírgulas dentro de colchetes/parênteses/strings)."""
     parts, cur = [], []
@@ -70,7 +71,12 @@ def _split_top_level_commas(s: str):
     return parts
 
 
-def generate_instance(code: str, mapping: dict, instance_name='u_instancia'):
+def generate_instance(
+    code: str,
+    mapping: dict,
+    second_memory: bool = False,
+    instance_name='u_instancia',
+):
     """
     Gera uma instância Verilog/SystemVerilog a partir de um `module` (com suporte a parâmetros).
     - mapping pode conter:
@@ -83,11 +89,48 @@ def generate_instance(code: str, mapping: dict, instance_name='u_instancia'):
     - Saídas/inout sem match -> ()
     """
 
+    controller_signals_non_open = {
+        'core_data_out': '0',
+        'core_stb': '1',
+        'core_cyc': '1',
+        'core_we': '0',
+    }
+
+    data_mem_signals_non_open = {
+        'data_mem_data_out': '0',
+        'data_mem_stb': '0',
+        'data_mem_cyc': '0',
+        'data_mem_we': '0',
+    }
+
+    if second_memory:
+        controller_signals_non_open.update(data_mem_signals_non_open)
+
+    assign_list = []
+
+    controller_signals_non_open_keys = list(controller_signals_non_open.keys())
+    mapping_keys = list(mapping.keys())
+
+    for key in controller_signals_non_open_keys:
+        if key not in mapping_keys:
+            assign_list.append(
+                f'assign {key} = {controller_signals_non_open[key]};'
+            )
+        elif (
+            mapping[key] is None
+            or mapping[key] == ''
+            or mapping[key] == 'null'
+            or mapping[key] == 'None'
+        ):
+            assign_list.append(
+                f'assign {key} = {controller_signals_non_open[key]};'
+            )
+
     # localizar module <name> #( ... )? ( ... ) ;
     header_pat = re.compile(
-        r'\bmodule\s+([A-Za-z_]\w*)'  # module name
-        r'(?:\s*#\s*\((?P<params>.*?)\)\s*)?'  # optional params block
-        r'\(\s*(?P<ports>.*?)\s*\)\s*;',  # ports block up to the terminating ');'
+        r'\bmodule\s+([A-Za-z_]\w*)'  # nome do módulo
+        r'(?:\s*#\s*\((?P<params>.*?)\)\s*)?'  # bloco opcional de parâmetros #( ... )
+        r'\s*\(\s*(?P<ports>.*?)\s*\)\s*;',  # bloco de portas ( ... );
         re.DOTALL,
     )
     m = header_pat.search(code)
@@ -173,6 +216,7 @@ def generate_instance(code: str, mapping: dict, instance_name='u_instancia'):
         else:
             if isinstance(key, str) and is_identifier(key):
                 const_map[key] = val
+                assign_list.append(f'assign {key} = {val};')
 
     # -----------------------
     # gerar instância (formatação alinhada)
@@ -194,13 +238,36 @@ def generate_instance(code: str, mapping: dict, instance_name='u_instancia'):
 
     # portas
     for direction, port in ports:
-        if port in reverse_map:
+        if direction == 'input' and (
+            'clk' in port.lower() or 'clock' in port.lower()
+        ):
+            conn = 'clk_core'
+        elif direction == 'input' and (
+            'rst_n' in port.lower()
+            or 'reset_n' in port.lower()
+            or 'rstn' in port.lower()
+            or 'resetn' in port.lower()
+            or 'nrst' in port.lower()
+            or 'nreset' in port.lower()
+            or 'rstb' in port.lower()
+            or 'resetb' in port.lower()
+            or 'brst' in port.lower()
+            or 'breset' in port.lower()
+            or 'rst_b' in port.lower()
+            or 'reset_b' in port.lower()
+        ):
+            conn = '!rst_core'
+        elif direction == 'input' and (
+            'rst' in port.lower() or 'reset' in port.lower()
+        ):
+            conn = 'rst_core'
+        elif port in reverse_map:
             conn = reverse_map[port]
         elif port in const_map:
             conn = const_map[port]
         elif direction == 'input':
             pl = port.lower()
-            if 'dbg_' in pl or 'trace_' in pl:
+            if 'dbg_' in pl or 'trace_' in pl or 'trc_' in pl or 'jtag' in pl:
                 conn = '0'
             elif pl.endswith('_en') or pl.endswith('_valid'):
                 conn = '1'
@@ -218,11 +285,16 @@ def generate_instance(code: str, mapping: dict, instance_name='u_instancia'):
         lines[-1] = lines[-1].rstrip(',')
     lines.append(');')
 
-    return '\n'.join(lines)
+    return '\n'.join(lines), '\n'.join(assign_list)
 
 
 def generate_wrapper(
-    cpu_name: str, instance_code: str, bus_type: str, second_memory: bool, output_dir='outputs'
+    cpu_name: str,
+    instance_code: str,
+    bus_type: str,
+    second_memory: bool,
+    output_dir='outputs',
+    signal_mappings: str = '',
 ):
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     template = env.get_template('wrapper.j2')
@@ -252,6 +324,7 @@ def generate_wrapper(
             'bus_type': bus_type,
             'second_memory': second_memory,
             'bus_adapter': adapter,
+            'signal_mappings': signal_mappings,
         }
     )
 
