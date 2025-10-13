@@ -262,7 +262,7 @@ def generate_instance(
     # -----------------------
     # gerar instância (formatação alinhada)
     # -----------------------
-    port_names = [p for (_, p) in ports]
+    port_names = [p for (_, p, _) in ports]
     max_port_len = max((len(p) for p in port_names), default=0)
     max_param_len = max((len(p[0]) for p in params), default=0)
 
@@ -278,7 +278,7 @@ def generate_instance(
         lines.append(f'{module_name} {instance_name} (')
 
     # portas
-    for direction, port in ports:
+    for direction, port, width in ports:
         if direction == 'input' and (
             'clk' in port.lower() or 'clock' in port.lower()
         ):

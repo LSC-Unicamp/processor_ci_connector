@@ -36,7 +36,11 @@ def filter_connections_from_response(response):
 
     connections_str = clean_json_block(connections_match.group(1))
 
-    connections = json.loads(connections_str)
+    try:
+        connections = json.loads(connections_str)
+    except json.JSONDecodeError:
+        logger.error(f'Failed to parse Connections JSON: {connections_str}')
+        return None
 
     return connections
 
@@ -74,10 +78,9 @@ def connect_interfaces(
 
     if not success:
         logger.error('Error communicating with the server.')
-        return None, None
+        return None
 
-    connections = filter_connections_from_response(response)
-    return connections
+    return filter_connections_from_response(response)
 
 
 def filter_processor_interface_from_response(response: str) -> str:
