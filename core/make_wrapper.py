@@ -2,6 +2,7 @@ import os
 import re
 import logging
 from core import TEMPLATES_DIR
+from core.bus_defines import PROCESSOR_CI_WISHBONE_SIGNALS
 from jinja2 import Environment, FileSystemLoader
 from core.bus_defines import (
     ahb_adapter,
@@ -15,6 +16,10 @@ from core.bus_defines import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def is_identifier(tok):
+    return bool(re.match(r'^[A-Za-z_]\w*$', tok))
 
 
 def _split_top_level_commas(s: str):
@@ -126,6 +131,22 @@ def generate_instance(
                 f'assign {key} = {controller_signals_non_open[key]};'
             )
 
+    if (
+        'data_mem_cyc' in mapping_keys
+        and 'data_mem_stb' in mapping_keys
+        and second_memory
+    ):
+        if mapping['data_mem_cyc'] == mapping[
+            'data_mem_stb'
+        ] and is_identifier(mapping['data_mem_cyc']):
+            assign_list.append('assign data_mem_cyc = 1;')
+
+    if 'core_cyc' in mapping_keys and 'core_stb' in mapping_keys:
+        if mapping['core_cyc'] == mapping['core_stb'] and is_identifier(
+            mapping['core_cyc']
+        ):
+            assign_list.append('assign core_cyc = 1;')
+
     # localizar module <name> #( ... )? ( ... ) ;
     header_pat = re.compile(
         r'\bmodule\s+([A-Za-z_]\w*)'  # nome do módulo
@@ -205,9 +226,6 @@ def generate_instance(
     reverse_map = {}
     const_map = {}
 
-    def is_identifier(tok):
-        return bool(re.match(r'^[A-Za-z_]\w*$', tok))
-
     for key, val in mapping.items():
         if val is None:
             continue
@@ -256,20 +274,32 @@ def generate_instance(
             or 'rst_b' in port.lower()
             or 'reset_b' in port.lower()
         ):
-            conn = '!rst_core'
+            conn = '~rst_core'
         elif direction == 'input' and (
             'rst' in port.lower() or 'reset' in port.lower()
         ):
             conn = 'rst_core'
         elif port in reverse_map:
-            conn = reverse_map[port]
+            if (
+                direction == 'input'
+                and is_identifier(reverse_map[port])
+                and reverse_map[port] not in PROCESSOR_CI_WISHBONE_SIGNALS
+            ):
+                conn = '0'
+            else:
+                conn = reverse_map[port]
         elif port in const_map:
             conn = const_map[port]
         elif direction == 'input':
             pl = port.lower()
             if 'dbg_' in pl or 'trace_' in pl or 'trc_' in pl or 'jtag' in pl:
                 conn = '0'
-            elif pl.endswith('_en') or pl.endswith('_valid'):
+            elif (
+                pl.endswith('_en')
+                or pl.endswith('_valid')
+                or 'poweron' in pl
+                or 'start_' in pl
+            ):
                 conn = '1'
             else:
                 conn = '0'

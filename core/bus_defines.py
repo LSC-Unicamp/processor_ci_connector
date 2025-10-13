@@ -83,6 +83,25 @@ PROTOCOLS = {
     },
 }
 
+PROCESSOR_CI_WISHBONE_SIGNALS = [
+    'core_cyc',
+    'core_stb',
+    'core_we',
+    'core_sel',
+    'core_addr',
+    'core_data_out',
+    'core_data_in',
+    'core_ack',
+    'data_mem_cyc',
+    'data_mem_stb',
+    'data_mem_we',
+    'data_mem_sel',
+    'data_mem_addr',
+    'data_mem_data_out',
+    'data_mem_data_in',
+    'data_mem_ack',
+]
+
 
 ahb_adapter = """
 // AHB - Instruction bus
