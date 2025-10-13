@@ -211,6 +211,7 @@ def generate_instance(
             if (
                 mapping['data_mem_cyc'] == mapping['data_mem_stb']
                 and mapping['data_mem_cyc'] is not None
+                and isinstance(mapping['data_mem_cyc'], str)
                 and is_identifier(mapping['data_mem_cyc'])
             ):
                 assign_list.append('assign data_mem_cyc = 1;')
@@ -219,6 +220,7 @@ def generate_instance(
             if (
                 mapping['core_cyc'] == mapping['core_stb']
                 and mapping['core_cyc'] is not None
+                and isinstance(mapping['core_cyc'], str)
                 and is_identifier(mapping['core_cyc'])
             ):
                 assign_list.append('assign core_cyc = 1;')
@@ -383,9 +385,13 @@ def generate_instance(
                 conn = port
                 if direction == 'input':
                     if reverse_map[port] in OUTPUT_SIGNALS:
-                        assign_list.append(f'assign {port} = _{reverse_map[port]};')
+                        assign_list.append(
+                            f'assign {port} = _{reverse_map[port]};'
+                        )
                     else:
-                        assign_list.append(f'assign {port} = {reverse_map[port]};')
+                        assign_list.append(
+                            f'assign {port} = {reverse_map[port]};'
+                        )
                 else:
                     assign_list.append(f'assign {reverse_map[port]} = {port};')
             else:

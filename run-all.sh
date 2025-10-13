@@ -4,7 +4,9 @@
 CORES=("riskow" "Grande-Risco-5" "tinyriscv" "rvx" "rpu" "darkriscv" "kronos" "SuperScalar-RISCV-CPU" \
        "riscado-v" "Risco-5" "Baby-Risco-5" "nerv" "airisc_core_complex" "picorv32" \
        "riscv" "Hazard3" "leaf" "zero-riscy" "RPU" "fedar-f1-rv64im" "harv" "mor1kx" \
-       "potato" "riscv-atom" "Sprintrv" "mriscv" "rv3n" "cve2" "RS5" "serv" "VexRiscv")
+       "potato" "riscv-atom" "SprintRV" "mriscv" "rv3n" "cve2" "RS5" "serv" "VexRiscv"\
+       "cva6" "cva5" "core" "ibex" "mr1" "F03x" "nox" "scr1" "VexiiRiscv" "Toooba" "RV12" "rv3n" \
+       "rsd" "T02x" "T03x" "T13x" "Tethorax" "Taiga" "starsea_riscv" "RISC-V" "RiftCore" "Rift2Core")
 #riscv, rpu , zero-riscy, leaf, kronos, sprintrv, VexRiscv, rs5
 
 LOG_DIR=logs
