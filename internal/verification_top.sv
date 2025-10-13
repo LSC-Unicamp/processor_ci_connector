@@ -61,7 +61,7 @@ processorci_top ptop (
 
 // Instância da primeira memória
 Memory #(
-    .MEMORY_FILE ("/eda/processor_ci/internal/memory.hex"), // Arquivo de memória inicial
+    .MEMORY_FILE ("/eda/processor_ci_connector/internal/memory.hex"), // Arquivo de memória inicial
     .MEMORY_SIZE (4096)
 ) Memory (
     .clk    (clk),

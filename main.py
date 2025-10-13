@@ -160,7 +160,7 @@ def main() -> None:
 
     second_memory = interface_and_ports.get('memory_interface', '') == 'Dual'
 
-    instance, assign_list = generate_instance(
+    instance, assign_list, create_signals = generate_instance(
         header,
         connections,
         second_memory=second_memory,
@@ -176,6 +176,7 @@ def main() -> None:
         second_memory,
         args.output,
         assign_list,
+        create_signals,
     )
 
     logging.info('Iniciando simulação para verificação...')

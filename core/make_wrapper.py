@@ -2,6 +2,12 @@ import os
 import re
 import logging
 from core import TEMPLATES_DIR
+from core.defines import (
+    CONTROLLER_SIGNALS_NON_OPEN,
+    DATA_MEM_SIGNALS_NON_OPEN,
+    TYPE_WORDS,
+    OPERATORS,
+)
 from core.bus_defines import PROCESSOR_CI_WISHBONE_SIGNALS
 from jinja2 import Environment, FileSystemLoader
 from core.bus_defines import (
@@ -20,6 +26,32 @@ logger = logging.getLogger(__name__)
 
 def is_identifier(tok):
     return bool(re.match(r'^[A-Za-z_]\w*$', tok))
+
+
+def get_signals_to_create(expression: str):
+    # split using operators as delimiters defineds in OPERATORS
+    pattern = r'(' + '|'.join(re.escape(op) for op in OPERATORS) + r')'
+    tokens = re.split(pattern, expression)
+
+    # remove whitespace and filter out empty tokens
+    tokens = [tok.strip() for tok in tokens if is_identifier(tok.strip())]
+    return tokens
+
+
+def create_signals_to_declare(signal_list, ports) -> str:
+    """Gera declarações 'logic' para sinais com base em lista de sinais e portas (direction, name, width)."""
+    # Mapeia nome da porta para largura
+    port_widths = {p[1]: p[2] for p in ports}
+
+    lines = []
+    for signal in signal_list:
+        width = port_widths.get(signal, 0)
+        if width <= 1:
+            lines.append(f'logic {signal};')
+        else:
+            lines.append(f'logic [{width-1}:0] {signal};')
+
+    return '\n'.join(lines) + '\n'
 
 
 def _split_top_level_commas(s: str):
@@ -94,24 +126,14 @@ def generate_instance(
     - Saídas/inout sem match -> ()
     """
 
-    controller_signals_non_open = {
-        'core_data_out': '0',
-        'core_stb': '1',
-        'core_cyc': '1',
-        'core_we': '0',
-    }
-
-    data_mem_signals_non_open = {
-        'data_mem_data_out': '0',
-        'data_mem_stb': '0',
-        'data_mem_cyc': '0',
-        'data_mem_we': '0',
-    }
+    controller_signals_non_open = CONTROLLER_SIGNALS_NON_OPEN
 
     if second_memory:
-        controller_signals_non_open.update(data_mem_signals_non_open)
+        controller_signals_non_open.update(DATA_MEM_SIGNALS_NON_OPEN)
 
     assign_list = []
+    create_list = []
+    created_signals = set()
 
     controller_signals_non_open_keys = list(controller_signals_non_open.keys())
     mapping_keys = list(mapping.keys())
@@ -181,19 +203,6 @@ def generate_instance(
     ports = []
     current_dir = None
 
-    type_words = {
-        'reg',
-        'wire',
-        'logic',
-        'signed',
-        'unsigned',
-        'integer',
-        'bit',
-        'byte',
-        'int',
-        'shortint',
-    }
-
     for chunk in chunks:
         s = chunk.strip()
         if not s:
@@ -209,16 +218,25 @@ def generate_instance(
                 continue
             rest = s
 
-        # Remove ranges e tipos
-        rest = re.sub(r'\[[^\]]+\]', '', rest)
-        tokens = [t.strip(',;') for t in rest.split() if t.strip(',;')]
-
-        for t in tokens:
-            if t.lower() in type_words:
+        # Captura range [msb:lsb] e nome da porta
+        # Ex: logic [31:0] data_i, data_j
+        # Regex captura opcional [msb:lsb] e identificador
+        matches = re.findall(r'(\[[^\]]+\])?\s*([A-Za-z_]\w*)', rest)
+        for range_str, name in matches:
+            if name.lower() in TYPE_WORDS:
                 continue
-            if not re.match(r'^[A-Za-z_]\w*$', t):
-                continue
-            ports.append((current_dir, t))
+            # calcula largura
+            if range_str:
+                m = re.match(r'\[(\d+)\s*:\s*(\d+)\]', range_str)
+                if m:
+                    msb = int(m.group(1))
+                    lsb = int(m.group(2))
+                    width = abs(msb - lsb) + 1
+                else:
+                    width = 1
+            else:
+                width = 1
+            ports.append((current_dir, name, width))
 
     # -----------------------
     # interpretar mapping
@@ -235,6 +253,11 @@ def generate_instance(
             if isinstance(key, str) and is_identifier(key):
                 const_map[key] = val
                 assign_list.append(f'assign {key} = {val};')
+                signals_to_create = get_signals_to_create(val)
+                created_signals.update(signals_to_create)
+                if signals_to_create:
+                    decl = create_signals_to_declare(signals_to_create, ports)
+                    create_list.append(decl)
 
     # -----------------------
     # gerar instância (formatação alinhada)
@@ -303,6 +326,8 @@ def generate_instance(
                 conn = '1'
             else:
                 conn = '0'
+        elif direction == 'output' and port in created_signals:
+            conn = port
         else:
             conn = ''  # outputs/inout -> vazio
 
@@ -315,7 +340,7 @@ def generate_instance(
         lines[-1] = lines[-1].rstrip(',')
     lines.append(');')
 
-    return '\n'.join(lines), '\n'.join(assign_list)
+    return '\n'.join(lines), '\n'.join(assign_list), '\n'.join(create_list)
 
 
 def generate_wrapper(
@@ -325,6 +350,7 @@ def generate_wrapper(
     second_memory: bool,
     output_dir='outputs',
     signal_mappings: str = '',
+    create_signals: str = '',
 ):
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     template = env.get_template('wrapper.j2')
@@ -355,6 +381,7 @@ def generate_wrapper(
             'second_memory': second_memory,
             'bus_adapter': adapter,
             'signal_mappings': signal_mappings,
+            'create_signals': create_signals,
         }
     )
 
