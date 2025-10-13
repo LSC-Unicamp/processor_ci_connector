@@ -15,11 +15,13 @@ logger = logging.getLogger(__name__)
 
 def filter_connections_from_response(response):
     def clean_json_block(block: str):
-        # Remove comments (// ...)
+        # Remove comentários tipo // ...
         block = re.sub(r'//.*', '', block)
-        # Remove trailing commas
-        block = re.sub(r',\s*}', '}', block)
-        block = re.sub(r',\s*]', ']', block)
+        # Remove comentários tipo /* ... */
+        block = re.sub(r'/\*.*?\*/', '', block, flags=re.DOTALL)
+        # Remove vírgulas sobrando antes de } ou ]
+        block = re.sub(r',\s*([}\]])', r'\1', block)
+        # Remove espaços em excesso
         return block.strip()
 
     # Regex to capture Connections and Defaults blocks (with optional ** markdown formatting)

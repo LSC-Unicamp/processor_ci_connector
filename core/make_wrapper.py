@@ -254,9 +254,10 @@ def generate_instance(
                 const_map[key] = val
                 assign_list.append(f'assign {key} = {val};')
                 signals_to_create = get_signals_to_create(val)
-                created_signals.update(signals_to_create)
                 if signals_to_create:
+                    signals_to_create = [s for s in signals_to_create if s not in created_signals]
                     decl = create_signals_to_declare(signals_to_create, ports)
+                    created_signals.update(signals_to_create)
                     create_list.append(decl)
 
     # -----------------------
