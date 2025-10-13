@@ -61,29 +61,40 @@ def main() -> None:
     parser.add_argument(
         '-o', '--output', type=str, default='outputs', help='Output directory'
     )
+    parser.add_argument(
+        '--convert-to-verilog2005',
+        action='store_true',
+        help='Convert to Verilog 2005 using sv2v',
+    )
+    parser.add_argument(
+        '-f',
+        '--format-code',
+        action='store_true',
+        help='Format the code to human readable style using verible',
+    )
 
     args = parser.parse_args()
 
     handler = colorlog.StreamHandler()
     formatter = colorlog.ColoredFormatter(
-        "%(log_color)s%(asctime)s [%(name)s] %(levelname)s:%(reset)s %(message)s",
-        datefmt="%H:%M:%S",
+        '%(log_color)s%(asctime)s [%(name)s] %(levelname)s:%(reset)s %(message)s',
+        datefmt='%H:%M:%S',
         log_colors={
             'DEBUG': 'cyan',
             'INFO': 'green',
             'WARNING': 'yellow',
             'ERROR': 'red',
             'CRITICAL': 'bold_red,bg_white',
-        }
+        },
     )
     handler.setFormatter(formatter)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        handlers=[handler]
+        handlers=[handler],
     )
 
-    logging.debug("Modo detalhado ativado" if args.verbose else "Modo normal")
+    logging.debug('Modo detalhado ativado' if args.verbose else 'Modo normal')
 
     logging.info('Lendo configuração do processador...')
 
@@ -105,6 +116,8 @@ def main() -> None:
         include_dirs,
         args.processor_path,
         context=args.context,
+        convert_to_verilog2005=args.convert_to_verilog2005,
+        format_code=args.format_code,
     )
 
     logging.debug(f'Cabeçalho extraído:\n{header}')
@@ -137,14 +150,22 @@ def main() -> None:
     while connections is None and tentativas < 3:
         tentativas += 1
         logging.debug(f'Tentativa {tentativas} de 3...')
-        connections = connect_interfaces(interface_and_ports, header, args.model)
+        connections = connect_interfaces(
+            interface_and_ports, header, args.model
+        )
 
     if tentativas == 3 and connections is None:
-            logging.error('Erro ao parsear json')
-            sys.exit(1)
+        logging.error('Erro ao parsear json')
+        sys.exit(1)
 
+    second_memory = interface_and_ports.get('memory_interface', '') == 'Dual'
 
-    instance = generate_instance(header, connections, 'Processor')
+    instance, assign_list = generate_instance(
+        header,
+        connections,
+        second_memory=second_memory,
+        instance_name='Processor',
+    )
 
     logging.info('Gerando wrapper...')
 
@@ -152,13 +173,20 @@ def main() -> None:
         args.processor,
         instance,
         interface_and_ports['bus_type'],
-        interface_and_ports.get('memory_interface', '') == 'Dual',
-        args.output
+        second_memory,
+        args.output,
+        assign_list,
     )
 
     logging.info('Iniciando simulação para verificação...')
 
-    simulate_to_check(args.processor, other_files, include_flags, args.output)
+    simulate_to_check(
+        args.processor,
+        other_files,
+        include_flags,
+        args.output,
+        second_memory=second_memory,
+    )
 
 
 if __name__ == '__main__':

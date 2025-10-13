@@ -5,30 +5,35 @@
 
 module verification_top (
     input logic clk,  // Clock de sistema
-    input logic rst_n // Reset do sistema
+    input logic rst_n, // Reset do sistema
+
+    output logic        core_cyc,      // Indica uma transação ativa
+    output logic        core_stb,      // Indica uma solicitação ativa
+    output logic        core_we,       // 1 = Write, 0 = Read
+
+    output logic [3:0]  core_sel,      // Seletores de byte
+    output logic [31:0] core_addr,     // Endereço
+    output logic [31:0] core_data_out // Dados de entrada (para escrita)
+
+    `ifdef ENABLE_SECOND_MEMORY
+,
+    output logic        data_mem_cyc,
+    output logic        data_mem_stb,
+    output logic        data_mem_we,
+    output logic [3:0]  data_mem_sel,
+    output logic [31:0] data_mem_addr,
+    output logic [31:0] data_mem_data_out
+    `endif
 );
 
 
-// Fios do barramento entre Controller e a primeira memória
-logic        core_cyc;
-logic        core_stb;
-logic        core_we;
-logic [31:0] core_addr;
-logic [31:0] core_data_out;
-logic [31:0] core_data_in;
-logic        core_ack;
+logic [31:0] core_data_in;  // Dados de saída (para leitura)
+logic        core_ack;      // Confirmação da transação
 
 `ifdef ENABLE_SECOND_MEMORY
-// Fios do barramento entre Controller e Second Memory
-logic        data_mem_cyc;
-logic        data_mem_stb;
-logic        data_mem_we;
-logic [31:0] data_mem_addr;
-logic [31:0] data_mem_data_out;
 logic [31:0] data_mem_data_in;
 logic        data_mem_ack;
 `endif
-
 
 processorci_top ptop (
     .sys_clk           (clk),     

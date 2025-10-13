@@ -70,6 +70,8 @@ def process_verilog(
     include_dirs: list[str],
     processor_path,
     context: int = 20,
+    convert_to_verilog2005: bool = False,
+    format_code: bool = False,
 ):
     vhdl_files = []
     other_files = []
@@ -110,7 +112,7 @@ def process_verilog(
         else:
             logger.warning(f'Diretório de include não encontrado: {inc_path}')
 
-    logger.info("Pré-processando arquivos Verilog com Verilator...")
+    logger.info('Pré-processando arquivos Verilog com Verilator...')
 
     verilator_preprocess_cmd = [
         'verilator',
@@ -122,7 +124,7 @@ def process_verilog(
         '-DSYNTH',
         '-DEN_EXCEPT',
         '-DEN_RVZICSR',
-        "--quiet",
+        '--quiet',
         '-Wall',
         '-Wno-UNOPTFLAT',
         '-Wno-IMPLICIT',
@@ -136,7 +138,26 @@ def process_verilog(
     proc = subprocess.run(
         verilator_preprocess_cmd, capture_output=True, text=True
     )
-    lines = proc.stdout.splitlines()
+
+    output = proc.stdout
+
+    if convert_to_verilog2005:
+        logger.info('Convertendo para Verilog 2005 com verilog2verilog...')
+        sv2v_cmd = ['sv2v']
+        proc2 = subprocess.run(
+            sv2v_cmd, input=output, capture_output=True, text=True
+        )
+        output = proc2.stdout
+
+    if format_code:
+        logger.info('Formatando código Verilog com Verible...')
+        verible_cmd = ['verible-verilog-format', '--inplace', '--']
+        proc3 = subprocess.run(
+            verible_cmd, input=output, capture_output=True, text=True
+        )
+        output = proc3.stdout
+
+    lines = output.splitlines()
 
     logging.debug(f'Comando Verilator: {" ".join(verilator_preprocess_cmd)}')
 
@@ -183,7 +204,11 @@ def process_verilog(
 
 
 def simulate_to_check(
-    cpu_name: str, files_list: list[str], include_flags: list[str], output_dir: str = 'outputs'
+    cpu_name: str,
+    files_list: list[str],
+    include_flags: list[str],
+    output_dir: str = 'outputs',
+    second_memory: bool = False,
 ):
     logging.info('Compilando e executando simulação com Verilator...')
 
@@ -221,7 +246,7 @@ def simulate_to_check(
         '-Wno-UNUSED',
         '--top-module',
         'verification_top',
-        "--quiet",
+        '--quiet',
         '--Mdir',
         'build',
         os.path.join(INTERNAL_DIR, 'soc_main.cpp'),
@@ -231,12 +256,57 @@ def simulate_to_check(
         '-std=c++17',
     ]
 
+    if second_memory:
+        verilator_cmd.append('-DENABLE_SECOND_MEMORY')
+
     logger.info(f"[CMD] {' '.join(verilator_cmd)}")
     subprocess.run(verilator_cmd, check=True, cwd=BUILD_DIR)
+
+    expected_output = (0x3C, 0x5)
 
     sim_executable = os.path.join(BUILD_DIR, 'build', 'Vverification_top')
     if os.path.exists(sim_executable):
         logger.info('Executando simulação...')
-        subprocess.run([str(sim_executable)], check=True)
+        result = subprocess.run(
+            [str(sim_executable)], check=True, capture_output=True, text=True
+        )
+        lines = result.stdout.splitlines()
+
+        logger.debug('Saída completa da simulação:')
+
+        for line in lines:
+            logger.debug(f'Saída da simulação: {line}')
+
+        ok = False
+        for line in lines:
+            values = line.strip().split(',')
+            if len(values) != 3:
+                logger.warning(f'Linha de saída inesperada: {line}')
+                continue
+            addr_str, data_str, cycle_str = values
+            addr = int(addr_str, 16)
+            data = int(data_str, 16)
+            cycle = int(cycle_str)
+            if (addr, data) == expected_output:
+                ok = True
+                logger.info(f'Saída esperada encontrada: {line}')
+            else:
+                logger.warning(f'Saída inesperada: {line}')
+
+        if ok:
+            logger.info(
+                'Simulação concluída com sucesso. A CPU está funcionando corretamente.'
+            )
+            logger.info(
+                f'Endereço: 0x{expected_output[0]:08X}, Dado: 0x{expected_output[1]:08X}'
+            )
+        else:
+            logger.error(
+                'Simulação concluída, mas a saída esperada não foi encontrada.'
+            )
+            logger.error(
+                f'Esperado: Endereço 0x{expected_output[0]:08X}, Dado: 0x{expected_output[1]:08X}'
+            )
+            logger.error('Verifique os logs acima para mais detalhes.')
     else:
         logger.error('Executável de simulação não encontrado.')
