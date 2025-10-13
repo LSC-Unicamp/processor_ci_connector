@@ -75,12 +75,16 @@ def parse_parameters(params_block: str):
         return params
 
     # divide o bloco em "declarações de parâmetro" no nível superior
-    param_entries = re.findall(r'parameter\s+[^,()]+(?:,[^,()]+)*', params_block, re.DOTALL)
+    param_entries = re.findall(
+        r'parameter\s+[^,()]+(?:,[^,()]+)*', params_block, re.DOTALL
+    )
     if not param_entries:  # fallback simples
         param_entries = params_block.split(',')
 
     for entry in param_entries:
-        m = re.match(r'\s*parameter\s+([A-Za-z_]\w*)\s*=\s*(.+)', entry.strip())
+        m = re.match(
+            r'\s*parameter\s+([A-Za-z_]\w*)\s*=\s*(.+)', entry.strip()
+        )
         if not m:
             continue
         name = m.group(1).strip()

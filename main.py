@@ -17,21 +17,22 @@ PROCESSOR_CI_PATH = os.getenv('PROCESSOR_CI_PATH', '/eda/processor_ci')
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description='Processador CI  Conector',
+        description='Processador CI Conector',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
+
     parser.add_argument(
         '-c',
         '--config',
         type=str,
         default=DEFAULT_CONFIG_PATH,
-        help='Caminho para o diretório de configuração',
+        help='Path to the configuration directory',
     )
     parser.add_argument(
         '-p',
         '--processor',
         type=str,
-        help='Nome do processador (ex: Grande-Risco-5)',
+        help='Processor name (e.g., Grande-Risco-5)',
         required=True,
     )
     parser.add_argument(
@@ -46,7 +47,7 @@ def main() -> None:
         '--model',
         type=str,
         default='qwen3:14b',
-        help='Model to use for the LLM',
+        help='LLM model to use',
     )
     parser.add_argument(
         '-P',
@@ -56,21 +57,28 @@ def main() -> None:
         help='Path to the processor source code',
     )
     parser.add_argument(
-        '-v', '--verbose', action='store_true', help='Exibe logs detalhados'
+        '-v',
+        '--verbose',
+        action='store_true',
+        help='Display detailed logs',
     )
     parser.add_argument(
-        '-o', '--output', type=str, default='outputs', help='Output directory'
+        '-o',
+        '--output',
+        type=str,
+        default='outputs',
+        help='Output directory',
     )
     parser.add_argument(
         '--convert-to-verilog2005',
         action='store_true',
-        help='Convert to Verilog 2005 using sv2v',
+        help='Convert source code to Verilog 2005 using sv2v',
     )
     parser.add_argument(
         '-f',
         '--format-code',
         action='store_true',
-        help='Format the code to human readable style using verible',
+        help='Format code to a human-readable style using Verible',
     )
 
     args = parser.parse_args()
