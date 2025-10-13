@@ -58,6 +58,7 @@ logic clk_core, rst_core;
 `ifdef SIMULATION
 assign clk_core = sys_clk;
 assign rst_core = ~rst_n;
+
 `else
 
 // Fios do barramento entre Controller e Processor
@@ -138,6 +139,45 @@ Controller #(
     .data_mem_ack_o     (data_mem_ack)
     `endif
 );
+`endif
+
+logic [31:0] _core_data_in;
+logic        _core_ack;
+`ifdef ENABLE_SECOND_MEMORY
+logic [31:0] _data_mem_data_in;
+logic        _data_mem_ack;
+`endif
+
+`ifdef PIPELINED_WISHBONE
+always_ff @(posedge clk_core) begin
+    if (rst_core) begin
+        _core_ack <= 1'b0;
+        _core_data_in <= 32'b0;
+    end else begin
+        _core_ack <= core_ack;
+        _core_data_in <= core_data_in;
+    end
+end
+`else
+assign _core_ack = core_ack;
+assign _core_data_in = core_data_in;
+`endif
+
+`ifdef ENABLE_SECOND_MEMORY
+`ifdef PIPELINED_WISHBONE
+always_ff @(posedge clk_core) begin
+    if (rst_core) begin
+        _data_mem_ack <= 1'b0;
+        _data_mem_data_in <= 32'b0;
+    end else begin
+        _data_mem_ack <= data_mem_ack;
+        _data_mem_data_in <= data_mem_data_in;
+    end
+end
+`else
+assign _data_mem_ack = data_mem_ack;
+assign _data_mem_data_in = data_mem_data_in;
+`endif
 `endif
 
 // Core space

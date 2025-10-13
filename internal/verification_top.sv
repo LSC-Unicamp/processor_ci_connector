@@ -7,32 +7,47 @@ module verification_top (
     input logic clk,  // Clock de sistema
     input logic rst_n, // Reset do sistema
 
-    output logic        core_cyc,      // Indica uma transação ativa
-    output logic        core_stb,      // Indica uma solicitação ativa
-    output logic        core_we,       // 1 = Write, 0 = Read
-
-    output logic [3:0]  core_sel,      // Seletores de byte
-    output logic [31:0] core_addr,     // Endereço
-    output logic [31:0] core_data_out // Dados de entrada (para escrita)
-
-    `ifdef ENABLE_SECOND_MEMORY
-,
-    output logic        data_mem_cyc,
-    output logic        data_mem_stb,
-    output logic        data_mem_we,
-    output logic [3:0]  data_mem_sel,
-    output logic [31:0] data_mem_addr,
-    output logic [31:0] data_mem_data_out
-    `endif
+    output logic cyc,
+    output logic stb,
+    output logic we,
+    output logic [31:0] addr,
+    output logic [31:0] data_out,
 );
-
 
 logic [31:0] core_data_in;  // Dados de saída (para leitura)
 logic        core_ack;      // Confirmação da transação
+logic        core_cyc;      // Indica uma transação ativa
+logic        core_stbl;     // Indica uma solicitação ativa
+logic        core_we;       // 1 = Write, 0 = Read
+
+logic [3:0]  core_sel;      // Seletores de byte
+logic [31:0] core_addr;     // Endereço
+logic [31:0] core_data_out; // Dados de entrada (para escrita)
 
 `ifdef ENABLE_SECOND_MEMORY
+logic        data_mem_cyc;
+logic        data_mem_stb;
+logic        data_mem_we;
+logic [3:0]  data_mem_sel;
+logic [31:0] data_mem_addr;
+logic [31:0] data_mem_data_out;
+
 logic [31:0] data_mem_data_in;
 logic        data_mem_ack;
+`endif
+
+`ifdef ENABLE_SECOND_MEMORY
+assign cyc      = data_mem_cyc;
+assign stb      = data_mem_stb;
+assign we       = data_mem_we;
+assign addr     = data_mem_addr;
+assign data_out = data_mem_data_out;
+`else
+assign cyc      = core_cyc;
+assign stb      = core_stb;
+assign we       = core_we;
+assign addr     = core_addr;
+assign data_out = core_data_out;
 `endif
 
 processorci_top ptop (

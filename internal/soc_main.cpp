@@ -38,21 +38,12 @@ int main(int argc, char **argv, char **env) {
         top->eval();
 
         // MONITORAMENTO DE MEMÓRIA
-        #ifdef ENABLE_SECOND_MEMORY
-        if (top->data_mem_cyc && top->data_mem_stb && top->data_mem_we) {
-            if (top->data_mem_addr == TARGET_ADDR) {
+        if (top->cyc && top->stb && top->we) {
+            if (top->addr == TARGET_ADDR) {
                 printf("0x%08X,0x%08X,%d\n",
-                            top->data_mem_addr, top->data_mem_data_out, i);
+                            top->addr, top->data_out, i);
             }
         }
-        #else
-        if (top->core_cyc && top->core_stb && top->core_we) {
-            if (top->core_addr == TARGET_ADDR) {
-                printf("0x%08X,0x%08X,%d\n",
-                            top->core_addr, top->core_data_out, i);
-            }
-        }
-        #endif
 
         trace->dump(i * CLOCK_PERIOD);
     }

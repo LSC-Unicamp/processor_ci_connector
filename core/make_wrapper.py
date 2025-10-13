@@ -321,7 +321,7 @@ def generate_instance(
                     assign_list.append(f'assign {key} = {val};')
                 else:
                     for s in signals_to_create:
-                        assign_list.append(f'assign {s} = {key};')
+                        assign_list.append(f'assign {s} = _{key};')
 
     # -----------------------
     # gerar instância (formatação alinhada)
@@ -382,11 +382,17 @@ def generate_instance(
             elif port in created_signals:
                 conn = port
                 if direction == 'input':
-                    assign_list.append(f'assign {port} = {reverse_map[port]};')
+                    if reverse_map[port] in OUTPUT_SIGNALS:
+                        assign_list.append(f'assign {port} = _{reverse_map[port]};')
+                    else:
+                        assign_list.append(f'assign {port} = {reverse_map[port]};')
                 else:
                     assign_list.append(f'assign {reverse_map[port]} = {port};')
             else:
-                conn = reverse_map[port]
+                if reverse_map[port] in OUTPUT_SIGNALS:
+                    conn = f'_{reverse_map[port]}'
+                else:
+                    conn = reverse_map[port]
         elif port in const_map:
             conn = const_map[port]
         elif port in created_signals:
