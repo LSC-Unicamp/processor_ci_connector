@@ -5,6 +5,13 @@ CONTROLLER_SIGNALS_NON_OPEN = {
     'core_we': '0',
 }
 
+OUTPUT_SIGNALS = {
+    'core_ack',
+    'core_data_in',
+    'data_mem_ack',
+    'data_mem_data_in',
+}
+
 DATA_MEM_SIGNALS_NON_OPEN = {
     'data_mem_data_out': '0',
     'data_mem_stb': '0',

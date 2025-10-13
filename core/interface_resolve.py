@@ -15,33 +15,68 @@ logger = logging.getLogger(__name__)
 
 def filter_connections_from_response(response):
     def clean_json_block(block: str):
-        # Remove comentários tipo // ...
+        """Remove comentários e vírgulas inválidas do bloco JSON."""
+        # Remove comentários tipo // e /* ... */
         block = re.sub(r'//.*', '', block)
-        # Remove comentários tipo /* ... */
         block = re.sub(r'/\*.*?\*/', '', block, flags=re.DOTALL)
         # Remove vírgulas sobrando antes de } ou ]
         block = re.sub(r',\s*([}\]])', r'\1', block)
-        # Remove espaços em excesso
         return block.strip()
 
-    # Regex to capture Connections and Defaults blocks (with optional ** markdown formatting)
-    connections_match = re.search(
-        r'\*{0,2}Connections\*{0,2}:\s*({.*?})', response, re.DOTALL
-    )
+    def extract_balanced_braces(text, start_index):
+        """Extrai um bloco com chaves balanceadas a partir do primeiro '{'."""
+        brace_count = 0
+        for i, ch in enumerate(text[start_index:], start=start_index):
+            if ch == '{':
+                brace_count += 1
+            elif ch == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    return text[start_index : i + 1]
+        return None  # não encontrou fechamento
 
-    if not connections_match:
-        connections_match = re.search(r'({\s*".*?}\s*)', response, re.DOTALL)
+    # Encontrar início do JSON
+    match = re.search(r'Connections\s*:\s*{', response)
+    if match:
+        start_index = response.find('{', match.start())
+    else:
+        start_index = response.find('{')
+        if start_index == -1:
+            logger.warning('Could not find JSON object in response.')
+            return None
 
-    if not connections_match:
-        logger.warning('Could not find Connections in the response.')
+    # Extrair o bloco com chaves balanceadas
+    block = extract_balanced_braces(response, start_index)
+    if not block:
+        logger.error('Unbalanced braces in response.')
         return None
 
-    connections_str = clean_json_block(connections_match.group(1))
+    # Limpar conteúdo básico
+    block = clean_json_block(block)
 
+    # Proteger expressões HDL { ... } que não são objetos JSON
+    def protect_hdl_expr(m):
+        expr = m.group(0)
+        # Se já está entre aspas (ex: "{2'b0, X}"), não tocar
+        before = block[: m.start()]
+        after = block[m.end() :]
+        if before.endswith('"') and after.startswith('"'):
+            return expr  # já protegido
+        # Se não tem ':' (não é JSON), transformar em string
+        if ':' not in expr:
+            return f'"{expr}"'
+        return expr
+
+    block = re.sub(r'\{[^:{}]+\}', protect_hdl_expr, block)
+
+    # Corrigir aspas duplicadas tipo ""foo""
+    block = re.sub(r'""([^"]+)""', r'"\1"', block)
+
+    # Fazer parse final
     try:
-        connections = json.loads(connections_str)
-    except json.JSONDecodeError:
-        logger.error(f'Failed to parse Connections JSON: {connections_str}')
+        connections = json.loads(block)
+    except json.JSONDecodeError as e:
+        logger.error(f'Failed to parse Connections JSON: {e}\n{block}')
         return None
 
     return connections

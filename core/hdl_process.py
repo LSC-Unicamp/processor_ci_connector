@@ -234,6 +234,7 @@ def simulate_to_check(
         '--build',
         '--trace',
         '-Wno-fatal',
+        '-DENABLE_SECOND_MEMORY' if second_memory else '',
         '-DSIMULATION',
         '-DSYNTHESIS',
         '-DSYNTH',

@@ -7,6 +7,7 @@ from core.defines import (
     DATA_MEM_SIGNALS_NON_OPEN,
     TYPE_WORDS,
     OPERATORS,
+    OUTPUT_SIGNALS,
 )
 from core.bus_defines import PROCESSOR_CI_WISHBONE_SIGNALS
 from jinja2 import Environment, FileSystemLoader
@@ -17,8 +18,6 @@ from core.bus_defines import (
     axi4_data_adapter,
     axi4_lite_adapter,
     axi4_lite_data_adapter,
-    avalon_adapter,
-    avalon_data_adapter,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,13 +27,28 @@ def is_identifier(tok):
     return bool(re.match(r'^[A-Za-z_]\w*$', tok))
 
 
+def clean_token(tok):
+    # remove leading/trailing whitespace
+    tok = tok.strip()
+    tok = tok.replace('(', '')
+    tok = tok.replace(')', '')
+    tok = tok.replace('[', '')
+    tok = tok.replace(']', '')
+    tok = tok.replace('{', '')
+    tok = tok.replace('}', '')
+    tok = tok.replace(';', '')
+    return tok
+
+
 def get_signals_to_create(expression: str):
     # split using operators as delimiters defineds in OPERATORS
     pattern = r'(' + '|'.join(re.escape(op) for op in OPERATORS) + r')'
     tokens = re.split(pattern, expression)
 
+    tokens = [clean_token(tok) for tok in tokens]
+
     # remove whitespace and filter out empty tokens
-    tokens = [tok.strip() for tok in tokens if is_identifier(tok.strip())]
+    tokens = [tok.strip() for tok in tokens if is_identifier(tok)]
     return tokens
 
 
@@ -52,6 +66,36 @@ def create_signals_to_declare(signal_list, ports) -> str:
             lines.append(f'logic [{width-1}:0] {signal};')
 
     return '\n'.join(lines) + '\n'
+
+
+def parse_parameters(params_block: str):
+    """Extrai parâmetros de um bloco #( ... ) tolerando expressões complexas."""
+    params = []
+    if not params_block:
+        return params
+
+    # divide o bloco em "declarações de parâmetro" no nível superior
+    param_entries = re.findall(r'parameter\s+[^,()]+(?:,[^,()]+)*', params_block, re.DOTALL)
+    if not param_entries:  # fallback simples
+        param_entries = params_block.split(',')
+
+    for entry in param_entries:
+        m = re.match(r'\s*parameter\s+([A-Za-z_]\w*)\s*=\s*(.+)', entry.strip())
+        if not m:
+            continue
+        name = m.group(1).strip()
+        value = m.group(2).strip().rstrip(',')  # remove vírgulas de separação
+
+        # balanceamento básico de {}
+        if value.count('{') != value.count('}'):
+            value = '0'
+        elif '{' in value and '}' in value:
+            # ainda pode ter concatenação complexa, protege
+            if re.search(r'\{.*\{.*\}.*\}', value):  # nested braces
+                value = '0'
+
+        params.append((name, value))
+    return params
 
 
 def _split_top_level_commas(s: str):
@@ -112,7 +156,8 @@ def generate_instance(
     code: str,
     mapping: dict,
     second_memory: bool = False,
-    instance_name='u_instancia',
+    instance_name: str = 'u_instancia',
+    use_adapter: bool = False,
 ):
     """
     Gera uma instância Verilog/SystemVerilog a partir de um `module` (com suporte a parâmetros).
@@ -138,40 +183,46 @@ def generate_instance(
     controller_signals_non_open_keys = list(controller_signals_non_open.keys())
     mapping_keys = list(mapping.keys())
 
-    for key in controller_signals_non_open_keys:
-        if key not in mapping_keys:
-            assign_list.append(
-                f'assign {key} = {controller_signals_non_open[key]};'
-            )
-        elif (
-            mapping[key] is None
-            or mapping[key] == ''
-            or mapping[key] == 'null'
-            or mapping[key] == 'None'
-        ):
-            assign_list.append(
-                f'assign {key} = {controller_signals_non_open[key]};'
-            )
+    if not use_adapter:
+        for key in controller_signals_non_open_keys:
+            if key not in mapping_keys:
+                assign_list.append(
+                    f'assign {key} = {controller_signals_non_open[key]};'
+                )
+            elif (
+                mapping[key] is None
+                or mapping[key] == ''
+                or mapping[key] == 'null'
+                or mapping[key] == 'None'
+            ):
+                assign_list.append(
+                    f'assign {key} = {controller_signals_non_open[key]};'
+                )
 
-    if (
-        'data_mem_cyc' in mapping_keys
-        and 'data_mem_stb' in mapping_keys
-        and second_memory
-    ):
-        if mapping['data_mem_cyc'] == mapping[
-            'data_mem_stb'
-        ] and is_identifier(mapping['data_mem_cyc']):
-            assign_list.append('assign data_mem_cyc = 1;')
-
-    if 'core_cyc' in mapping_keys and 'core_stb' in mapping_keys:
-        if mapping['core_cyc'] == mapping['core_stb'] and is_identifier(
-            mapping['core_cyc']
+        if (
+            'data_mem_cyc' in mapping_keys
+            and 'data_mem_stb' in mapping_keys
+            and second_memory
         ):
-            assign_list.append('assign core_cyc = 1;')
+            if (
+                mapping['data_mem_cyc'] == mapping['data_mem_stb']
+                and mapping['data_mem_cyc'] is not None
+                and is_identifier(mapping['data_mem_cyc'])
+            ):
+                assign_list.append('assign data_mem_cyc = 1;')
+
+        if 'core_cyc' in mapping_keys and 'core_stb' in mapping_keys:
+            if (
+                mapping['core_cyc'] == mapping['core_stb']
+                and mapping['core_cyc'] is not None
+                and is_identifier(mapping['core_cyc'])
+            ):
+                assign_list.append('assign core_cyc = 1;')
 
     # localizar module <name> #( ... )? ( ... ) ;
     header_pat = re.compile(
         r'\bmodule\s+([A-Za-z_]\w*)'  # nome do módulo
+        r'(?:\s+import\s+[^;]+;\s*)*'  # zero ou mais imports
         r'(?:\s*#\s*\((?P<params>.*?)\)\s*)?'  # bloco opcional de parâmetros #( ... )
         r'\s*\(\s*(?P<ports>.*?)\s*\)\s*;',  # bloco de portas ( ... );
         re.DOTALL,
@@ -189,12 +240,13 @@ def generate_instance(
     # -----------------------
     # parse parâmetros (parameter ...)
     # -----------------------
-    params = []
-    if params_block:
-        for pname, pval in re.findall(
-            r'parameter\s+([A-Za-z_]\w*)\s*=\s*([^,)+]+)', params_block
-        ):
-            params.append((pname.strip(), pval.strip()))
+    params = parse_parameters(params_block)
+    # params = []
+    # if params_block:
+    #     for pname, pval in re.findall(
+    #         r'parameter\s+([A-Za-z_]\w*)\s*=\s*([^,)+]+)', params_block
+    #     ):
+    #         params.append((pname.strip(), pval.strip()))
 
     # -----------------------
     # parse portas
@@ -252,13 +304,20 @@ def generate_instance(
         else:
             if isinstance(key, str) and is_identifier(key):
                 const_map[key] = val
-                assign_list.append(f'assign {key} = {val};')
                 signals_to_create = get_signals_to_create(val)
+                signals_to_create = [
+                    s for s in signals_to_create if s not in created_signals
+                ]
                 if signals_to_create:
-                    signals_to_create = [s for s in signals_to_create if s not in created_signals]
                     decl = create_signals_to_declare(signals_to_create, ports)
                     created_signals.update(signals_to_create)
                     create_list.append(decl)
+
+                if not key in OUTPUT_SIGNALS:
+                    assign_list.append(f'assign {key} = {val};')
+                else:
+                    for s in signals_to_create:
+                        assign_list.append(f'assign {s} = {key};')
 
     # -----------------------
     # gerar instância (formatação alinhada)
@@ -297,6 +356,12 @@ def generate_instance(
             or 'breset' in port.lower()
             or 'rst_b' in port.lower()
             or 'reset_b' in port.lower()
+            or 'rstz' in port.lower()
+            or 'resetz' in port.lower()
+            or 'zrst' in port.lower()
+            or 'zreset' in port.lower()
+            or 'rst_z' in port.lower()
+            or 'reset_z' in port.lower()
         ):
             conn = '~rst_core'
         elif direction == 'input' and (
@@ -310,10 +375,18 @@ def generate_instance(
                 and reverse_map[port] not in PROCESSOR_CI_WISHBONE_SIGNALS
             ):
                 conn = '0'
+            elif port in created_signals:
+                conn = port
+                if direction == 'input':
+                    assign_list.append(f'assign {port} = {reverse_map[port]};')
+                else:
+                    assign_list.append(f'assign {reverse_map[port]} = {port};')
             else:
                 conn = reverse_map[port]
         elif port in const_map:
             conn = const_map[port]
+        elif port in created_signals:
+            conn = port
         elif direction == 'input':
             pl = port.lower()
             if 'dbg_' in pl or 'trace_' in pl or 'trc_' in pl or 'jtag' in pl:
@@ -327,8 +400,6 @@ def generate_instance(
                 conn = '1'
             else:
                 conn = '0'
-        elif direction == 'output' and port in created_signals:
-            conn = port
         else:
             conn = ''  # outputs/inout -> vazio
 
@@ -356,6 +427,8 @@ def generate_wrapper(
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     template = env.get_template('wrapper.j2')
 
+    logger.info(f'Bus type: {bus_type}, Second memory: {second_memory}')
+
     adapter = ''
 
     if bus_type == 'AHB':
@@ -370,10 +443,10 @@ def generate_wrapper(
         adapter = axi4_lite_adapter
         if second_memory:
             adapter += '\n' + axi4_lite_data_adapter
-    elif bus_type == 'Avalon':
-        adapter = avalon_adapter
-        if second_memory:
-            adapter += '\n' + avalon_data_adapter
+    # elif bus_type == 'Avalon':
+    #     adapter = avalon_adapter
+    #     if second_memory:
+    #         adapter += '\n' + avalon_data_adapter
 
     output = template.render(
         {

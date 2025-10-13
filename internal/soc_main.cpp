@@ -2,10 +2,10 @@
 #include <verilated_vcd_c.h>
 #include "Vverification_top.h"
 
-#define CLOCK_PERIOD 20 // 25 MHz -> 40 ns por ciclo
-#define SIMULATION_CYCLES 4000
-const uint32_t TARGET_ADDR = 60;   // Endereço que você quer monitorar
-const uint32_t TARGET_DATA = 5; // Valor que você quer monitorar
+#define CLOCK_PERIOD 20         // 25 MHz -> 40 ns por ciclo
+#define SIMULATION_CYCLES 4000  // Número total de ciclos de clock para simulação
+#define TARGET_ADDR 60          // Endereço que você quer monitorar
+#define TARGET_DATA 5           // Valor que você quer monitorar
 
 int main(int argc, char **argv, char **env) {
     Verilated::commandArgs(argc, argv);

@@ -159,12 +159,18 @@ def main() -> None:
         sys.exit(1)
 
     second_memory = interface_and_ports.get('memory_interface', '') == 'Dual'
+    use_adapter = interface_and_ports.get('bus_type', '') not in [
+        'Wishbone',
+        'Custom',
+        'Avalon',
+    ]
 
     instance, assign_list, create_signals = generate_instance(
         header,
         connections,
         second_memory=second_memory,
         instance_name='Processor',
+        use_adapter=use_adapter,
     )
 
     logging.info('Gerando wrapper...')

@@ -280,6 +280,8 @@ module ahb_to_wishbone #(
     input  logic                  wb_ack
 );
 
+- For dual memory interface, second memory adapter use DATA_ prefix in signal names (e.g., DATA_HADDR, DATA_HWRITE, ...)
+
 Processor interface:
 
 {processor_interface}
@@ -396,6 +398,8 @@ module AXI4Lite_to_Wishbone #(
     input  logic                  wb_ack_i,
     input  logic                  wb_err_i
 );
+
+- For dual memory interface, second memory adapter use DATA_ prefix in signal names (e.g., DATA_AWADDR, DATA_AWPROT, ...)
 
 Processor interface:
 

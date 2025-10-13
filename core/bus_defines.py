@@ -105,17 +105,17 @@ PROCESSOR_CI_WISHBONE_SIGNALS = [
 
 ahb_adapter = """
 // AHB - Instruction bus
-logic [31:0] haddr;
-logic        hwrite;
-logic [2:0]  hsize;
-logic [2:0]  hburst;
-logic        hmastlock;
-logic [3:0]  hprot;
-logic [1:0]  htrans;
-logic [31:0] hwdata;
-logic [31:0] hrdata;
-logic        hready;
-logic        hresp;
+logic [31:0] HADDR;
+logic        HWRITE;
+logic [2:0]  HSIZE;
+logic [2:0]  HBURST;
+logic        HMASTLOCK;
+logic [3:0]  HPROT;
+logic [1:0]  HTRANS;
+logic [31:0] HWDATA;
+logic [31:0] HRDATA;
+logic        HREADY;
+logic        HRESP;
 
 ahb_to_wishbone #( // bus adapter
     .ADDR_WIDTH(32),
@@ -126,18 +126,18 @@ ahb_to_wishbone #( // bus adapter
     .HRESETn    (~rst_core),
 
     // AHB interface
-    .HADDR      (haddr),
-    .HTRANS     (htrans),
-    .HWRITE     (hwrite),
-    .HSIZE      (hsize),
-    .HBURST     (hburst),
-    .HPROT      (hprot),
-    .HLOCK      (hmastlock),
-    .HWDATA     (hwdata),
-    .HREADY     (hready),
-    .HRDATA     (hrdata),
-    .HREADYOUT  (hready), // normalmente igual a HREADY em designs simples
-    .HRESP      (hresp),
+    .HADDR      (HADDR),
+    .HTRANS     (HTRANS),
+    .HWRITE     (HWRITE),
+    .HSIZE      (HSIZE),
+    .HBURST     (HBURST),
+    .HPROT      (HPROT),
+    .HLOCK      (HMASTLOCK),
+    .HWDATA     (HWDATA),
+    .HREADY     (HREADY),
+    .HRDATA     (HRDATA),
+    .HREADYOUT  (HREADY), // normalmente igual a HREADY em designs simples
+    .HRESP      (HRESP),
 
     // Wishbone interface
     .wb_cyc     (core_cyc),
@@ -154,17 +154,17 @@ ahb_to_wishbone #( // bus adapter
 ahb_data_adapter = """
 // AHB - Data bus
 // AHB - Instruction bus
-logic [31:0] data_haddr;
-logic        data_hwrite;
-logic [2:0]  data_hsize;
-logic [2:0]  data_hburst;
-logic        data_hmastlock;
-logic [3:0]  data_hprot;
-logic [1:0]  data_htrans;
-logic [31:0] data_hwdata;
-logic [31:0] data_hrdata;
-logic        data_hready;
-logic        data_hresp;
+logic [31:0] DATA_HADDR;
+logic        DATA_HWRITE;
+logic [2:0]  DATA_HSIZE;
+logic [2:0]  DATA_HBURST;
+logic        DATA_HMASTLOCK;
+logic [3:0]  DATA_HPROT;
+logic [1:0]  DATA_HTRANS;
+logic [31:0] DATA_HWDATA;
+logic [31:0] DATA_HRDATA;
+logic        DATA_HREADY;
+logic        DATA_HRESP;
 
 ahb_to_wishbone #( // bus adapter
     .ADDR_WIDTH(32),
@@ -175,18 +175,18 @@ ahb_to_wishbone #( // bus adapter
     .HRESETn    (~rst_core),
 
     // AHB interface
-    .HADDR      (data_haddr),
-    .HTRANS     (data_htrans),
-    .HWRITE     (data_hwrite),
-    .HSIZE      (data_hsize),
-    .HBURST     (data_hburst),
-    .HPROT      (data_hprot),
-    .HLOCK      (data_hmastlock),
-    .HWDATA     (data_hwdata),
-    .HREADY     (data_hready),
-    .HRDATA     (data_hrdata),
-    .HREADYOUT  (data_hready), // normalmente igual a HREADY em designs simples
-    .HRESP      (data_hresp),
+    .HADDR      (DATA_HADDR),
+    .HTRANS     (DATA_HTRANS),
+    .HWRITE     (DATA_HWRITE),
+    .HSIZE      (DATA_HSIZE),
+    .HBURST     (DATA_HBURST),
+    .HPROT      (DATA_HPROT),
+    .HLOCK      (DATA_HMASTLOCK),
+    .HWDATA     (DATA_HWDATA),
+    .HREADY     (DATA_HREADY),
+    .HRDATA     (DATA_HRDATA),
+    .HREADYOUT  (DATA_HREADY), // normalmente igual a HREADY em designs simples
+    .HRESP      (DATA_HRESP),
 
     // Wishbone interface
     .wb_cyc     (data_mem_cyc),
@@ -201,19 +201,233 @@ ahb_to_wishbone #( // bus adapter
 """
 
 axi4_lite_adapter = """
+logic [31:0] AWADDR;
+logic [2:0]  AWPROT;
+logic        AWVALID;
+logic        AWREADY;
+logic [31:0] WDATA;
+logic [3:0]  WSTRB;
+logic        WVALID;
+logic        WREADY;
+logic [1:0]  BRESP;
+logic        BVALID;
+logic        BREADY;
+logic [31:0] ARADDR;
+logic [2:0]  ARPROT;
+logic        ARVALID;
+logic        ARREADY;
+logic [31:0] RDATA;
+logic [1:0]  RRESP;
+logic        RVALID;
+logic        RREADY;
+
+AXI4Lite_to_Wishbone #(
+    .ADDR_WIDTH           (32),
+    .DATA_WIDTH           (32)
+) u_AXI4Lite_to_Wishbone (
+    .ACLK                 (clk_core),                      // 1 bit
+    .ARESETN              (~rst_core),                     // 1 bit
+    .AWADDR               (AWADDR),                        // ? bits
+    .AWPROT               (AWPROT),                        // 3 bits
+    .AWVALID              (AWVALID),                       // 1 bit
+    .AWREADY              (AWREADY),                       // 1 bit
+    .WDATA                (WDATA),                         // ? bits
+    .WSTRB                (WSTRB),                         // ? bits
+    .WVALID               (WVALID),                        // 1 bit
+    .WREADY               (WREADY),                        // 1 bit
+    .BRESP                (BRESP),                         // 2 bits
+    .BVALID               (BVALID),                        // 1 bit
+    .BREADY               (BREADY),                        // 1 bit
+    .ARADDR               (ARADDR),                        // ? bits
+    .ARPROT               (ARPROT),                        // 3 bits
+    .ARVALID              (ARVALID),                       // 1 bit
+    .ARREADY              (ARREADY),                       // 1 bit
+    .RDATA                (RDATA),                         // ? bits
+    .RRESP                (RRESP),                         // 2 bits
+    .RVALID               (RVALID),                        // 1 bit
+    .RREADY               (RREADY),                        // 1 bit
+    .wb_adr_o             (core_addr),                     // ? bits
+    .wb_dat_o             (core_data_out),                 // ? bits
+    .wb_we_o              (core_we),                       // 1 bit
+    .wb_stb_o             (core_stb),                      // 1 bit
+    .wb_cyc_o             (core_cyc),                      // 1 bit
+    .wb_sel_o             (core_sel),                      // ? bits
+    .wb_dat_i             (core_data_in),                  // ? bits
+    .wb_ack_i             (core_ack),                      // 1 bit
+    .wb_err_i             (0),                             // 1 bit
+);
 """
 
 axi4_lite_data_adapter = """
+logic [31:0] DATA_AWADDR;
+logic [2:0]  DATA_AWPROT;
+logic        DATA_AWVALID;
+logic        DATA_AWREADY;
+logic [31:0] DATA_WDATA;
+logic [3:0]  DATA_WSTRB;
+logic        DATA_WVALID;
+logic        DATA_WREADY;
+logic [1:0]  DATA_BRESP;
+logic        DATA_BVALID;
+logic        DATA_BREADY;
+logic [31:0] DATA_ARADDR;
+logic [2:0]  DATA_ARPROT;
+logic        DATA_ARVALID;
+logic        DATA_ARREADY;
+logic [31:0] DATA_RDATA;
+logic [1:0]  DATA_RRESP;
+logic        DATA_RVALID;
+logic        DATA_RREADY;
+
+AXI4Lite_to_Wishbone #(
+    .ADDR_WIDTH           (32),
+    .DATA_WIDTH           (32)
+) u_data_AXI4Lite_to_Wishbone (
+    .ACLK                 (DATA_ACLK),                     // 1 bit
+    .ARESETN              (DATA_ARESETN),                  // 1 bit
+    .AWADDR               (DATA_AWADDR),                   // ? bits
+    .AWPROT               (DATA_AWPROT),                   // 3 bits
+    .AWVALID              (DATA_AWVALID),                  // 1 bit
+    .AWREADY              (DATA_AWREADY),                  // 1 bit
+    .WDATA                (DATA_WDATA),                    // ? bits
+    .WSTRB                (DATA_WSTRB),                    // ? bits
+    .WVALID               (DATA_WVALID),                   // 1 bit
+    .WREADY               (DATA_WREADY),                   // 1 bit
+    .BRESP                (DATA_BRESP),                    // 2 bits
+    .BVALID               (DATA_BVALID),                   // 1 bit
+    .BREADY               (DATA_BREADY),                   // 1 bit
+    .ARADDR               (DATA_ARADDR),                   // ? bits
+    .ARPROT               (DATA_ARPROT),                   // 3 bits
+    .ARVALID              (DATA_ARVALID),                  // 1 bit
+    .ARREADY              (DATA_ARREADY),                  // 1 bit
+    .RDATA                (DATA_RDATA),                    // ? bits
+    .RRESP                (DATA_RRESP),                    // 2 bits
+    .RVALID               (DATA_RVALID),                   // 1 bit
+    .RREADY               (DATA_RREADY),                   // 1 bit
+    .wb_adr_o             (data_mem_addr),                 // ? bits
+    .wb_dat_o             (data_mem_data_out),             // ? bits
+    .wb_we_o              (data_mem_we),                   // 1 bit
+    .wb_stb_o             (data_mem_stb),                  // 1 bit
+    .wb_cyc_o             (data_mem_cyc),                  // 1 bit
+    .wb_sel_o             (data_mem_sel),                  // ? bits
+    .wb_dat_i             (data_mem_data_in),              // ? bits
+    .wb_ack_i             (data_mem_ack),                  // 1 bit
+    .wb_err_i             (0),                             // 1 bit
+);
 """
 
 axi4_adapter = """
+logic [3:0]  AXI_AWID;
+logic [31:0] AXI_AWADDR;
+logic        AXI_AWVALID;
+logic        AXI_AWREADY;
+logic [3:0]  AXI_BID;
+logic [1:0]  AXI_BRESP;
+logic        AXI_BVALID;
+logic        AXI_BREADY;
+logic [3:0]  AXI_ARID;
+logic [31:0] AXI_ARADDR;
+logic        AXI_ARVALID;
+logic        AXI_ARREADY;
+logic [3:0]  AXI_RID;
+logic [31:0] AXI_RDATA;
+logic [1:0]  AXI_RRESP;
+logic        AXI_RVALID;
+logic        AXI_RREADY; 
+
+axi4_to_wishbone_simple #(
+    .ADDR_WIDTH           (32),
+    .DATA_WIDTH           (32),
+    .ID_WIDTH             (4)
+) u_axi4_to_wishbone_simple (
+    .clk                  (clk_core),                      // 1 bit
+    .rst_n                (~rst_core),                     // 1 bit
+    .AXI_AWID             (AXI_AWID),                      // ? bits
+    .AXI_AWADDR           (AXI_AWADDR),                    // ? bits
+    .AXI_AWVALID          (AXI_AWVALID),                   // 1 bit
+    .AXI_AWREADY          (AXI_AWREADY),                   // 1 bit
+    .AXI_WDATA            (AXI_WDATA),                     // ? bits
+    .AXI_WSTRB            (AXI_WSTRB),                     // ? bits
+    .AXI_WVALID           (AXI_WVALID),                    // 1 bit
+    .AXI_WREADY           (AXI_WREADY),                    // 1 bit
+    .AXI_BID              (AXI_BID),                       // ? bits
+    .AXI_BRESP            (AXI_BRESP),                     // 2 bits
+    .AXI_BVALID           (AXI_BVALID),                    // 1 bit
+    .AXI_BREADY           (AXI_BREADY),                    // 1 bit
+    .AXI_ARID             (AXI_ARID),                      // ? bits
+    .AXI_ARADDR           (AXI_ARADDR),                    // ? bits
+    .AXI_ARVALID          (AXI_ARVALID),                   // 1 bit
+    .AXI_ARREADY          (AXI_ARREADY),                   // 1 bit
+    .AXI_RID              (AXI_RID),                       // ? bits
+    .AXI_RDATA            (AXI_RDATA),                     // ? bits
+    .AXI_RRESP            (AXI_RRESP),                     // 2 bits
+    .AXI_RVALID           (AXI_RVALID),                    // 1 bit
+    .AXI_RREADY           (AXI_RREADY),                    // 1 bit
+    .WB_CYC               (core_cyc),                      // 1 bit
+    .WB_STB               (core_stb),                      // 1 bit
+    .WB_WE                (core_we),                       // 1 bit
+    .WB_ADDR              (core_addr),                     // ? bits
+    .WB_WDATA             (core_data_out),                 // ? bits
+    .WB_SEL               (core_sel),                      // ? bits
+    .WB_RDATA             (core_data_in),                  // ? bits
+    .WB_ACK               (core_ack),                      // 1 bit
+);
 """
 
 axi4_data_adapter = """
-"""
+logic [3:0]  DATA_AXI_AWID;
+logic [31:0] DATA_AXI_AWADDR;
+logic        DATA_AXI_AWVALID;
+logic        DATA_AXI_AWREADY;
+logic [3:0]  DATA_AXI_BID;
+logic [1:0]  DATA_AXI_BRESP;
+logic        DATA_AXI_BVALID;
+logic        DATA_AXI_BREADY;
+logic [3:0]  DATA_AXI_ARID;
+logic [31:0] DATA_AXI_ARADDR;
+logic        DATA_AXI_ARVALID;
+logic        DATA_AXI_ARREADY;
+logic [3:0]  DATA_AXI_RID;
+logic [31:0] DATA_AXI_RDATA;
+logic [1:0]  DATA_AXI_RRESP;
+logic        DATA_AXI_RVALID;
+logic        DATA_AXI_RREADY; 
 
-avalon_adapter = """
-"""
-
-avalon_data_adapter = """
+axi4_to_wishbone_simple #(
+    .ADDR_WIDTH           (32),
+    .DATA_WIDTH           (32),
+    .ID_WIDTH             (4)
+) u_axi4_to_wishbone_simple (
+    .clk                  (clk_core),                      // 1 bit
+    .rst_n                (~rst_core),                     // 1 bit
+    .AXI_AWID             (DATA_AXI_AWID),                 // ? bits
+    .AXI_AWADDR           (DATA_AXI_AWADDR),               // ? bits
+    .AXI_AWVALID          (DATA_AXI_AWVALID),              // 1 bit
+    .AXI_AWREADY          (DATA_AXI_AWREADY),              // 1 bit
+    .AXI_WDATA            (DATA_AXI_WDATA),                // ? bits
+    .AXI_WSTRB            (DATA_AXI_WSTRB),                // ? bits
+    .AXI_WVALID           (DATA_AXI_WVALID),               // 1 bit
+    .AXI_WREADY           (DATA_AXI_WREADY),               // 1 bit
+    .AXI_BID              (DATA_AXI_BID),                  // ? bits
+    .AXI_BRESP            (DATA_AXI_BRESP),                // 2 bits
+    .AXI_BVALID           (DATA_AXI_BVALID),               // 1 bit
+    .AXI_BREADY           (DATA_AXI_BREADY),               // 1 bit
+    .AXI_ARID             (DATA_AXI_ARID),                 // ? bits
+    .AXI_ARADDR           (DATA_AXI_ARADDR),               // ? bits
+    .AXI_ARVALID          (DATA_AXI_ARVALID),              // 1 bit
+    .AXI_ARREADY          (DATA_AXI_ARREADY),              // 1 bit
+    .AXI_RID              (DATA_AXI_RID),                  // ? bits
+    .AXI_RDATA            (DATA_AXI_RDATA),                // ? bits
+    .AXI_RRESP            (DATA_AXI_RRESP),                // 2 bits
+    .AXI_RVALID           (DATA_AXI_RVALID),               // 1 bit
+    .AXI_RREADY           (DATA_AXI_RREADY),               // 1 bit
+    .WB_CYC               (data_mem_cyc),                  // 1 bit
+    .WB_STB               (data_mem_stb),                  // 1 bit
+    .WB_WE                (data_mem_we),                   // 1 bit
+    .WB_ADDR              (data_mem_addr),                 // ? bits
+    .WB_WDATA             (data_mem_data_out),             // ? bits
+    .WB_SEL               (data_mem_sel),                  // ? bits
+    .WB_RDATA             (data_mem_data_in),              // ? bits
+    .WB_ACK               (data_mem_ack),                  // 1 bit
+);
 """

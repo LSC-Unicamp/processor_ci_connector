@@ -3,8 +3,9 @@
 
 CORES=("riskow" "Grande-Risco-5" "tinyriscv" "rvx" "rpu" "darkriscv" "kronos" "SuperScalar-RISCV-CPU" \
        "riscado-v" "Risco-5" "Baby-Risco-5" "nerv" "airisc_core_complex" "picorv32" \
-       "risc-v" "Hazard3" "leaf?" "zero-riscy" "rpu" "fedar-f1-rv64im" "harv" "mor1kx" \
-       "potato" "riscv-atom" "Sprintrv" "mriscv" "rv3n" "cve2" "RS5" "serv" "vexriscv")
+       "riscv" "Hazard3" "leaf" "zero-riscy" "RPU" "fedar-f1-rv64im" "harv" "mor1kx" \
+       "potato" "riscv-atom" "Sprintrv" "mriscv" "rv3n" "cve2" "RS5" "serv" "VexRiscv")
+#riscv, rpu , zero-riscy, leaf, kronos, sprintrv, VexRiscv, rs5
 
 LOG_DIR=logs
 mkdir -p "$LOG_DIR"
