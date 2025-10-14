@@ -174,57 +174,6 @@ def generate_instance(
     - Debug/trace inputs -> 1'b0
     - Saídas/inout sem match -> ()
     """
-
-    controller_signals_non_open = CONTROLLER_SIGNALS_NON_OPEN
-
-    if second_memory:
-        controller_signals_non_open.update(DATA_MEM_SIGNALS_NON_OPEN)
-
-    assign_list = []
-    create_list = []
-    created_signals = set()
-
-    controller_signals_non_open_keys = list(controller_signals_non_open.keys())
-    mapping_keys = list(mapping.keys())
-
-    if not use_adapter:
-        for key in controller_signals_non_open_keys:
-            if key not in mapping_keys:
-                assign_list.append(
-                    f'assign {key} = {controller_signals_non_open[key]};'
-                )
-            elif (
-                mapping[key] is None
-                or mapping[key] == ''
-                or mapping[key] == 'null'
-                or mapping[key] == 'None'
-            ):
-                assign_list.append(
-                    f'assign {key} = {controller_signals_non_open[key]};'
-                )
-
-        if (
-            'data_mem_cyc' in mapping_keys
-            and 'data_mem_stb' in mapping_keys
-            and second_memory
-        ):
-            if (
-                mapping['data_mem_cyc'] == mapping['data_mem_stb']
-                and mapping['data_mem_cyc'] is not None
-                and isinstance(mapping['data_mem_cyc'], str)
-                and is_identifier(mapping['data_mem_cyc'])
-            ):
-                assign_list.append('assign data_mem_cyc = 1;')
-
-        if 'core_cyc' in mapping_keys and 'core_stb' in mapping_keys:
-            if (
-                mapping['core_cyc'] == mapping['core_stb']
-                and mapping['core_cyc'] is not None
-                and isinstance(mapping['core_cyc'], str)
-                and is_identifier(mapping['core_cyc'])
-            ):
-                assign_list.append('assign core_cyc = 1;')
-
     # localizar module <name> #( ... )? ( ... ) ;
     header_pat = re.compile(
         r'\bmodule\s+([A-Za-z_]\w*)'  # nome do módulo
@@ -295,6 +244,65 @@ def generate_instance(
             else:
                 width = 1
             ports.append((current_dir, name, width))
+
+    # -----------------------
+    # lógica de sinais não mapeados
+    # -----------------------
+
+    controller_signals_non_open = CONTROLLER_SIGNALS_NON_OPEN
+
+    if second_memory:
+        controller_signals_non_open.update(DATA_MEM_SIGNALS_NON_OPEN)
+
+    assign_list = []
+    create_list = []
+    created_signals = set()
+
+    controller_signals_non_open_keys = list(controller_signals_non_open.keys())
+    mapping_keys = list(mapping.keys())
+
+    if not use_adapter:
+        for key in controller_signals_non_open_keys:
+            if key not in mapping_keys:
+                assign_list.append(
+                    f'assign {key} = {controller_signals_non_open[key]};'
+                )
+            elif (
+                mapping[key] is None
+                or mapping[key] == ''
+                or mapping[key] == 'null'
+                or mapping[key] == 'None'
+            ):
+                assign_list.append(
+                    f'assign {key} = {controller_signals_non_open[key]};'
+                )
+            # Sinal fruto de alucinação, não existe na lista de portas
+            elif mapping[key] not in {name for _, name, _ in ports}:
+                assign_list.append(
+                    f'assign {key} = {controller_signals_non_open[key]};'
+                )
+
+        if (
+            'data_mem_cyc' in mapping_keys
+            and 'data_mem_stb' in mapping_keys
+            and second_memory
+        ):
+            if (
+                mapping['data_mem_cyc'] == mapping['data_mem_stb']
+                and mapping['data_mem_cyc'] is not None
+                and isinstance(mapping['data_mem_cyc'], str)
+                and is_identifier(mapping['data_mem_cyc'])
+            ):
+                assign_list.append('assign data_mem_cyc = 1;')
+
+        if 'core_cyc' in mapping_keys and 'core_stb' in mapping_keys:
+            if (
+                mapping['core_cyc'] == mapping['core_stb']
+                and mapping['core_cyc'] is not None
+                and isinstance(mapping['core_cyc'], str)
+                and is_identifier(mapping['core_cyc'])
+            ):
+                assign_list.append('assign core_cyc = 1;')
 
     # -----------------------
     # interpretar mapping
