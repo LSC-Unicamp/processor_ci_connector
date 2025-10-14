@@ -183,7 +183,7 @@ def extract_interface_and_memory_ports(core_declaration, model='qwen2.5:32b'):
 
     prompt = find_interface_prompt.format(core_declaration=core_declaration)
 
-    logger.info(
+    logger.debug(
         f'Consulting model {model} to identify the processor interface...'
     )
 
