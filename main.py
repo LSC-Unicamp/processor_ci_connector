@@ -17,7 +17,7 @@ PROCESSOR_CI_PATH = os.getenv('PROCESSOR_CI_PATH', '/eda/processor_ci')
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description='Processador CI Conector',
+        description='Processor CI Conector',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
@@ -40,7 +40,7 @@ def main() -> None:
         '--context',
         type=int,
         default=10,
-        help='Number of context lines to include',
+        help='Number of context lines after the module definition',
     )
     parser.add_argument(
         '-m',
@@ -102,9 +102,9 @@ def main() -> None:
         handlers=[handler],
     )
 
-    logging.debug('Modo detalhado ativado' if args.verbose else 'Modo normal')
+    logging.debug('Detailed logging enabled.')
 
-    logging.info('Lendo configuração do processador...')
+    logging.info('Reading processor configuration...')
 
     config_path = os.path.join(args.config, f'{args.processor}.json')
     config_data = {}
@@ -115,7 +115,7 @@ def main() -> None:
     include_dirs = config_data.get('include_dirs', [])
     top_module = config_data.get('top_module', args.processor)
 
-    logging.info('Processando código HDL...')
+    logging.info('Processing HDL code...')
 
     header, other_files, include_flags = process_verilog(
         args.processor,
@@ -128,43 +128,45 @@ def main() -> None:
         format_code=args.format_code,
     )
 
-    logging.debug(f'Cabeçalho extraído:\n{header}')
+    logging.debug(f'Extracted header:\n{header}')
 
     interface_and_ports = None
 
-    logging.info('Extraindo interfaces e portas de memória...')
+    logging.info('Extracting interfaces and memory ports...')
 
     ok = False
     tentativas = 0
     # Tenta 3 vezes obter um json valido
     while not ok and tentativas < 3:
         tentativas += 1
-        logging.debug(f'Tentativa {tentativas} de 3...')
+        logging.debug(f'Attempt {tentativas} of 3...')
         ok, interface_and_ports = extract_interface_and_memory_ports(
             header, args.model
         )
 
     if tentativas == 3 and not ok:
-        logging.error('Erro ao parsear json')
+        logging.error('Error parsing JSON')
         sys.exit(1)
 
-    logging.debug(f'Interface detectada: {interface_and_ports}')
+    logging.debug(f'Detected interface: {interface_and_ports}')
 
-    logging.info('Conectando interfaces...')
+    logging.info('Connecting interfaces...')
 
     tentativas = 0
     connections = None
 
     while connections is None and tentativas < 3:
         tentativas += 1
-        logging.debug(f'Tentativa {tentativas} de 3...')
+        logging.debug(f'Attempt {tentativas} of 3...')
         connections = connect_interfaces(
             interface_and_ports, header, args.model
         )
 
     if tentativas == 3 and connections is None:
-        logging.error('Erro ao parsear json')
+        logging.error('Error parsing JSON')
         sys.exit(1)
+
+    logging.debug(f'Interface connections: {connections}')
 
     second_memory = interface_and_ports.get('memory_interface', '') == 'Dual'
     use_adapter = interface_and_ports.get('bus_type', '') not in [
@@ -172,6 +174,8 @@ def main() -> None:
         'Custom',
         'Avalon',
     ]
+
+    logging.info('Generating instance...')
 
     instance, assign_list, create_signals = generate_instance(
         header,
@@ -181,7 +185,7 @@ def main() -> None:
         use_adapter=use_adapter,
     )
 
-    logging.info('Gerando wrapper...')
+    logging.info('Generating wrapper...')
 
     generate_wrapper(
         args.processor,

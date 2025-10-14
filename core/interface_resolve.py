@@ -79,6 +79,11 @@ def filter_connections_from_response(response):
         logger.error(f'Failed to parse Connections JSON: {e}\n{block}')
         return None
 
+    # Confere se o json está plano. Não pode estar aninhado.
+    if any(isinstance(v, (dict, list, tuple)) for v in connections.values()):
+        logger.error('Wrong JSON format; Connections is nested.')
+        return None
+
     return connections
 
 
@@ -107,7 +112,7 @@ def connect_interfaces(
             memory_interface=interface_info['memory_interface'],
         )
 
-    logger.info(f'Consultando modelo {model} para conexões de interface...')
+    logger.info(f'Consulting model {model} for interface connections...')
 
     success, response = send_prompt(prompt, model=model)
 
@@ -154,7 +159,7 @@ def filter_processor_interface_from_response(response: str) -> str:
         parsed = json.loads(candidate)
         logger.debug(f'Successfully parsed with json.loads: {parsed}')
     except json.JSONDecodeError:
-        logger.warning(
+        logger.debug(
             'Failed to parse JSON with json.loads, trying ast.literal_eval...'
         )
         try:
@@ -164,7 +169,7 @@ def filter_processor_interface_from_response(response: str) -> str:
                 f'Successfully parsed with ast.literal_eval: {parsed}'
             )
         except (ValueError, SyntaxError):
-            logger.error(f'Failed to parse JSON from response: {candidate}')
+            logger.debug(f'Failed to parse JSON from response: {candidate}')
             return False, {}
 
     # --- 4. Keep only expected keys ---
@@ -179,7 +184,7 @@ def extract_interface_and_memory_ports(core_declaration, model='qwen2.5:32b'):
     prompt = find_interface_prompt.format(core_declaration=core_declaration)
 
     logger.info(
-        f'Consultando modelo {model} para identificar a interface do processador...'
+        f'Consulting model {model} to identify the processor interface...'
     )
 
     success, response = send_prompt(prompt, model=model)

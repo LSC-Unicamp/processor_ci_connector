@@ -236,7 +236,7 @@ def generate_instance(
     m = header_pat.search(code)
     if not m:
         raise ValueError(
-            'Não foi possível localizar o cabeçalho do módulo (module ... #( ... )? ( ... );).'
+            'Unable to locate module header (module ... #( ... )? ( ... );).'
         )
 
     module_name = m.group(1)

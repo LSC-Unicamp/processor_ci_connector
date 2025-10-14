@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def run_ghdl_import(cpu_name, vhdl_files):
     """Importar todos os arquivos VHDL com GHDL -i."""
-    logger.info('Importando arquivos VHDL com GHDL (-i)...')
+    logger.info('Importing VHDL files with GHDL (-i)...')
     cmd = [
         'ghdl',
         '-i',
@@ -18,13 +18,13 @@ def run_ghdl_import(cpu_name, vhdl_files):
         f'--workdir={BUILD_DIR}',
         f'-P{BUILD_DIR}',
     ] + list(map(str, vhdl_files))
-    logger.info(f"[CMD] {' '.join(cmd)}")
+    logger.debug(f"[CMD] {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
 
 
 def run_ghdl_elaborate(cpu_name, top_module):
     """Elaborar com GHDL -m."""
-    logger.info('Elaborando projeto com GHDL (-m)...')
+    logger.info('Elaborating project with GHDL (-m)...')
     cmd = [
         'ghdl',
         '-m',
@@ -34,13 +34,13 @@ def run_ghdl_elaborate(cpu_name, top_module):
         f'-P{BUILD_DIR}',
         f'{top_module}',
     ]
-    logger.info(f"[CMD] {' '.join(cmd)}")
+    logger.debug(f"[CMD] {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
 
 
 def synthesize_to_verilog(cpu_name, output_file, top_module):
     """Sintetizar o VHDL com GHDL para Verilog."""
-    logger.info(f'Sintetizando {cpu_name} para Verilog...')
+    logger.info(f'Synthesizing {cpu_name} to Verilog...')
     cmd = [
         'ghdl',
         'synth',
@@ -52,7 +52,7 @@ def synthesize_to_verilog(cpu_name, output_file, top_module):
         '--out=verilog',
         top_module,
     ]
-    logger.info(f"[CMD] {' '.join(cmd)} > {output_file}")
+    logger.debug(f"[CMD] {' '.join(cmd)} > {output_file}")
     with open(output_file, 'w') as f:
         subprocess.run(cmd, stdout=f, check=True)
 
@@ -81,7 +81,7 @@ def process_verilog(
     for file_rel in files:
         src_file = os.path.join(processor_path, file_rel)
         if not os.path.exists(src_file):
-            logger.warning(f'Arquivo não encontrado: {src_file}')
+            logger.warning(f'File not found: {src_file}')
             continue
         if file_rel.strip().split('.')[-1].lower() in ['vhdl', 'vhd']:
             vhdl_files.append(str(src_file))
@@ -89,10 +89,10 @@ def process_verilog(
             other_files.append(str(src_file))
 
     if vhdl_files:
-        logger.info('Arquivos VHDL encontrados:')
+        logger.debug('Found VHDL files:')
         for vhdl_file in vhdl_files:
             logger.debug(f' - {vhdl_file}')
-        logger.info('Convertendo VHDL para Verilog...')
+        logger.info('Converting VHDL files to Verilog...')
         os.makedirs(BUILD_DIR, exist_ok=True)
         verilog_output = os.path.join(BUILD_DIR, f'{cpu_name}.v')
         convert_to_verilog(
@@ -110,9 +110,9 @@ def process_verilog(
         if os.path.exists(inc_path):
             include_flags.append(f'-I{inc_path}')
         else:
-            logger.warning(f'Diretório de include não encontrado: {inc_path}')
+            logger.warning(f'Include directory not found: {inc_path}')
 
-    logger.info('Pré-processando arquivos Verilog com Verilator...')
+    logger.info('Preprocessing Verilog files with Verilator...')
 
     verilator_preprocess_cmd = [
         'verilator',
@@ -142,7 +142,7 @@ def process_verilog(
     output = proc.stdout
 
     if convert_to_verilog2005:
-        logger.info('Convertendo para Verilog 2005 com verilog2verilog...')
+        logger.info('Converting to Verilog 2005 with verilog2verilog...')
         sv2v_cmd = ['sv2v']
         proc2 = subprocess.run(
             sv2v_cmd, input=output, capture_output=True, text=True
@@ -150,7 +150,7 @@ def process_verilog(
         output = proc2.stdout
 
     if format_code:
-        logger.info('Formatando código Verilog com Verible...')
+        logger.info('Formatting Verilog code with Verible...')
         verible_cmd = ['verible-verilog-format', '--inplace', '--']
         proc3 = subprocess.run(
             verible_cmd, input=output, capture_output=True, text=True
@@ -159,9 +159,9 @@ def process_verilog(
 
     lines = output.splitlines()
 
-    logging.debug(f'Comando Verilator: {" ".join(verilator_preprocess_cmd)}')
+    logging.debug(f'Verilator command: {" ".join(verilator_preprocess_cmd)}')
 
-    logging.info('Filtrando cabeçalho do módulo superior...')
+    logging.info('Filtering top module header...')
 
     header_lines = []
     inside_module = False
@@ -190,9 +190,10 @@ def process_verilog(
         if line.strip() != '' and not line.startswith('`line')
     )
 
-    logging.info('Salvando código Verilog processado...')
-
     output_path = os.path.join(BUILD_DIR, f'{cpu_name}_processed.sv')
+    
+    logging.info(f'Saving processed Verilog code to {output_path}...')
+
 
     # Salva o resultado em um único arquivo
     with open(output_path, 'w') as f:
