@@ -112,7 +112,7 @@ def connect_interfaces(
             memory_interface=interface_info['memory_interface'],
         )
 
-    logger.info(f'Consulting model {model} for interface connections...')
+    logger.debug(f'Consulting model {model} for interface connections...')
 
     success, response = send_prompt(prompt, model=model)
 
