@@ -106,7 +106,7 @@ def connect_interfaces(
             memory_interface=interface_info['memory_interface'],
         )
     else:
-        logger.warning('Defaulting to Wishbone.')
+        logger.debug('Defaulting to Wishbone.')
         prompt = wishbone_prompt.format(
             processor_interface=processor_interface,
             memory_interface=interface_info['memory_interface'],

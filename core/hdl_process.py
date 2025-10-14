@@ -261,7 +261,7 @@ def simulate_to_check(
     if second_memory:
         verilator_cmd.append('-DENABLE_SECOND_MEMORY')
 
-    logger.info(f"[CMD] {' '.join(verilator_cmd)}")
+    logger.debug(f"[CMD] {' '.join(verilator_cmd)}")
     subprocess.run(verilator_cmd, check=True, cwd=BUILD_DIR)
 
     expected_output = (0x3C, 0x5)

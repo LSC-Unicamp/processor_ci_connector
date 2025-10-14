@@ -148,7 +148,7 @@ def main() -> None:
         logging.error('Error parsing JSON')
         sys.exit(1)
 
-    logging.debug(f'Detected interface: {interface_and_ports}')
+    logging.info(f'Detected interface: {interface_and_ports}')
 
     logging.info('Connecting interfaces...')
 
