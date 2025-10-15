@@ -278,6 +278,7 @@ def generate_instance(
                 )
             # Sinal fruto de alucinação, não existe na lista de portas
             elif mapping[key] not in {name for _, name, _ in ports}:
+                mapping[key] = None
                 assign_list.append(
                     f'assign {key} = {controller_signals_non_open[key]};'
                 )
@@ -290,6 +291,7 @@ def generate_instance(
             if (
                 mapping['data_mem_cyc'] == mapping['data_mem_stb']
                 and mapping['data_mem_cyc'] is not None
+                and mapping['data_mem_cyc'] != 'null'
                 and isinstance(mapping['data_mem_cyc'], str)
                 and is_identifier(mapping['data_mem_cyc'])
             ):
@@ -299,10 +301,40 @@ def generate_instance(
             if (
                 mapping['core_cyc'] == mapping['core_stb']
                 and mapping['core_cyc'] is not None
+                and mapping['core_cyc'] != 'null'
                 and isinstance(mapping['core_cyc'], str)
                 and is_identifier(mapping['core_cyc'])
             ):
                 assign_list.append('assign core_cyc = 1;')
+
+        # caso a llm coloque os mesmos sinais para core e data_mem
+        if ('core_cyc' in mapping_keys and 'core_stb' in mapping_keys and
+            'data_mem_cyc' in mapping_keys and 'data_mem_stb' in mapping_keys and
+            second_memory
+            ):
+            if (
+                (mapping['core_cyc'] == mapping['data_mem_cyc'] or mapping['core_stb'] == mapping['data_mem_stb'])
+                and mapping['core_cyc'] is not None
+                and mapping['core_cyc'] != 'null'
+                and isinstance(mapping['core_cyc'], str)
+                and is_identifier(mapping['core_cyc'])
+                and mapping['core_stb'] is not None
+                and mapping['core_stb'] != 'null'
+                and isinstance(mapping['core_stb'], str)
+                and is_identifier(mapping['core_stb'])
+            ):
+                assign_list.append('assign core_stb = 1;')
+
+        # caso a llm coloque os mesmos sinais para core_we e data_we
+        if ('core_we' in mapping_keys and 'data_mem_we' in mapping_keys):
+            if (
+                mapping['core_we'] == mapping['data_mem_we']
+                and mapping['core_we'] is not None
+                and mapping['core_we'] != 'null'
+                and isinstance(mapping['core_we'], str)
+                and is_identifier(mapping['core_we'])
+            ):
+                assign_list.append('assign core_we = 0;')
 
     # -----------------------
     # interpretar mapping
