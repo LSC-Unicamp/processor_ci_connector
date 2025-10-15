@@ -15,14 +15,15 @@ Steps:
    - A single unified memory interface (shared instruction and data access).
    - Two separate memory interfaces (one for instruction fetch, one for data).
    Look for clues such as signal names containing "instr", "pc", "imem", "fetch", "idata" for instructions, and "data", "dmem", "store", "load" for data.
-5. Validate signals against the true semantics of each bus standard before assigning confidence:
+5. Validate signals against the true semantics of each bus standard:
    - Both the name and the function must match (timing, purpose, driver). 
    - Check that the signal’s bit-width and input/output direction are consistent with the bus specification.
    - Treat `cyc` and `stb` signals from a Wishbone interface as potentially merged into a single signal (e.g., read_request can represent cyc & stb).
    - For Avalon interfaces, prefer mappings where separate `read` and `write` signals exist.
 6. Decide which bus type(s) the module most closely matches.
-7. If fewer than 70% of the required signals of any bus match, classify as "Custom" with Low confidence. 
-Provide your reasoning first (step-by-step analysis following Steps 1–7), and then give the final structured result in the required JSON format:
+7. If fewer than 70% of the required signals of any bus match, classify as "Custom".
+8. It is crucial to provide the output in the exact JSON format specified below  
+Provide your reasoning first (step-by-step analysis following Steps 1–8), and then give the final structured result in the required JSON format:
 {{
   "bus_type": One of [AHB, AXI, Avalon, Wishbone, Custom]
   "memory_interface": Single or Dual
