@@ -280,7 +280,7 @@ def generate_instance(
             elif mapping[key] not in {name for _, name, _ in ports}:
                 mapping[key] = None
                 assign_list.append(
-                    f'assign {key} = {controller_signals_non_open[key]};'
+                    f'assign {key} = {controller_signals_non_open.get(key, 0)};'
                 )
 
         if (
@@ -308,9 +308,8 @@ def generate_instance(
                 assign_list.append('assign core_cyc = 1;')
 
         # caso a llm coloque os mesmos sinais para core e data_mem
-        if ('core_cyc' in mapping_keys and 'core_stb' in mapping_keys and
-            'data_mem_cyc' in mapping_keys and 'data_mem_stb' in mapping_keys and
-            second_memory
+        if (second_memory and 'core_cyc' in mapping_keys and 'core_stb' in mapping_keys and
+            'data_mem_cyc' in mapping_keys and 'data_mem_stb' in mapping_keys
             ):
             if (
                 (mapping['core_cyc'] == mapping['data_mem_cyc'] or mapping['core_stb'] == mapping['data_mem_stb'])
