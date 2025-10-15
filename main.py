@@ -197,7 +197,7 @@ def main() -> None:
         create_signals,
     )
 
-    logging.info('Iniciando simulação para verificação...')
+    logging.info('Starting simulation for verification...')
 
     simulate_to_check(
         args.processor,

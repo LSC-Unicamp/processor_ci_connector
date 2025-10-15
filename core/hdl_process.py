@@ -274,16 +274,16 @@ def simulate_to_check(
         )
         lines = result.stdout.splitlines()
 
-        logger.debug('Saída completa da simulação:')
+        logger.debug('Full simulation output:')
 
         for line in lines:
-            logger.debug(f'Saída da simulação: {line}')
+            logger.debug(f'Simulation output: {line}')
 
         ok = False
         for line in lines:
             values = line.strip().split(',')
             if len(values) != 3:
-                logger.warning(f'Linha de saída inesperada: {line}')
+                logger.warning(f'Unexpected output line: {line}')
                 continue
             addr_str, data_str, cycle_str = values
             addr = int(addr_str, 16)
@@ -291,24 +291,24 @@ def simulate_to_check(
             cycle = int(cycle_str)
             if (addr, data) == expected_output:
                 ok = True
-                logger.info(f'Saída esperada encontrada: {line}')
+                logger.info(f'Expected output found: {line}')
             else:
-                logger.warning(f'Saída inesperada: {line}')
+                logger.warning(f'Unexpected output: {line}')
 
         if ok:
             logger.info(
-                'Simulação concluída com sucesso. A CPU está funcionando corretamente.'
+                'Simulation completed successfully. The CPU is functioning correctly.'
             )
             logger.info(
-                f'Endereço: 0x{expected_output[0]:08X}, Dado: 0x{expected_output[1]:08X}'
+                f'Address: 0x{expected_output[0]:08X}, Data: 0x{expected_output[1]:08X}'
             )
         else:
             logger.error(
-                'Simulação concluída, mas a saída esperada não foi encontrada.'
+                'Simulation completed, but the expected output was not found.'
             )
             logger.error(
-                f'Esperado: Endereço 0x{expected_output[0]:08X}, Dado: 0x{expected_output[1]:08X}'
+                f'Expected: Address 0x{expected_output[0]:08X}, Data: 0x{expected_output[1]:08X}'
             )
-            logger.error('Verifique os logs acima para mais detalhes.')
+            logger.error('Check the logs above for more details.')
     else:
-        logger.error('Executável de simulação não encontrado.')
+        logger.error('Simulation executable not found.')
