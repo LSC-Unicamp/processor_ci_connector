@@ -117,7 +117,7 @@ def main() -> None:
 
     logging.info('Processing HDL code...')
 
-    header, other_files, include_flags = process_verilog(
+    header, other_files, include_flags, files = process_verilog(
         args.processor,
         top_module,
         files,
@@ -126,7 +126,15 @@ def main() -> None:
         context=args.context,
         convert_to_verilog2005=args.convert_to_verilog2005,
         format_code=args.format_code,
+        get_files_in_project=True,
     )
+
+    print('Arquivos: [')
+    for file in files:
+        if not 'result' in file and not 'tb' in file:
+            print(f"'{file}',")
+
+    print(']')
 
     logging.debug(f'Extracted header:\n{header}')
 

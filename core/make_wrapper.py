@@ -308,11 +308,18 @@ def generate_instance(
                 assign_list.append('assign core_cyc = 1;')
 
         # caso a llm coloque os mesmos sinais para core e data_mem
-        if (second_memory and 'core_cyc' in mapping_keys and 'core_stb' in mapping_keys and
-            'data_mem_cyc' in mapping_keys and 'data_mem_stb' in mapping_keys
-            ):
+        if (
+            second_memory
+            and 'core_cyc' in mapping_keys
+            and 'core_stb' in mapping_keys
+            and 'data_mem_cyc' in mapping_keys
+            and 'data_mem_stb' in mapping_keys
+        ):
             if (
-                (mapping['core_cyc'] == mapping['data_mem_cyc'] or mapping['core_stb'] == mapping['data_mem_stb'])
+                (
+                    mapping['core_cyc'] == mapping['data_mem_cyc']
+                    or mapping['core_stb'] == mapping['data_mem_stb']
+                )
                 and mapping['core_cyc'] is not None
                 and mapping['core_cyc'] != 'null'
                 and isinstance(mapping['core_cyc'], str)
@@ -325,7 +332,7 @@ def generate_instance(
                 assign_list.append('assign core_stb = 1;')
 
         # caso a llm coloque os mesmos sinais para core_we e data_we
-        if ('core_we' in mapping_keys and 'data_mem_we' in mapping_keys):
+        if 'core_we' in mapping_keys and 'data_mem_we' in mapping_keys:
             if (
                 mapping['core_we'] == mapping['data_mem_we']
                 and mapping['core_we'] is not None

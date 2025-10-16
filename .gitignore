@@ -216,3 +216,4 @@ tinyriscv.sv
 outputs/
 x.txt
 logs
+y.py

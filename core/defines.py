@@ -32,6 +32,31 @@ TYPE_WORDS = {
     'shortint',
 }
 
+KEYWORDS = {
+    'always',
+    'assign',
+    'begin',
+    'end',
+    'if',
+    'else',
+    'for',
+    'while',
+    'case',
+    'default',
+    'generate',
+    'parameter',
+    'localparam',
+    'function',
+    'task',
+    'module',
+    'endmodule',
+    'input',
+    'output',
+    'inout',
+    'wire',
+    'reg',
+}
+
 OPERATORS = {
     '==',
     '!=',

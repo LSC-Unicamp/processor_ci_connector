@@ -1,7 +1,9 @@
 import os
+import re
 import subprocess
 import logging
 from core import BUILD_DIR, INTERNAL_DIR
+from core.defines import KEYWORDS
 
 
 logger = logging.getLogger(__name__)
@@ -63,6 +65,68 @@ def convert_to_verilog(cpu_name, vhdl_files, top_module, output_file):
     synthesize_to_verilog(cpu_name, output_file, top_module)
 
 
+def search_files(text_lines: str, dire: str):
+    modules = set()
+    pattern = re.compile(r'(\w+)\s*(\w+)\s*\(')
+    # Verifica se algum módulo/entity é definido nesse arquivo
+
+    module_pattern = re.compile(r'^\s*module\s+(\w+)\s*\(')
+
+    extensions = ['.sv', '.v', '.vh', '.vhd']
+
+    for line in text_lines:
+        if line.strip() == '' and line.startswith('`line'):
+            continue
+        strip = line.strip()
+        out = pattern.search(strip)
+        module_out = module_pattern.search(strip)
+
+        if strip.endswith('#('):
+            split = strip.split(' ')
+            if 'module' in split[0]:
+                modules.add(split[1])
+            else:
+                modules.add(split[0])
+
+        elif ' #(' in strip:
+            split = strip.split(' ')
+            if 'module' in split[0]:
+                modules.add(split[1])
+            else:
+                modules.add(split[0])
+        else:
+            if module_out:
+                modules.add(module_out.group(1))
+            elif out and strip[-1] == '(' and not strip[0] == ')':
+                modules.add(out.group(1))
+
+    found_files = set()
+    module_file_patterns = {
+        name: re.compile(
+            rf'^\s*module\s+{re.escape(name)}\b', re.IGNORECASE | re.MULTILINE
+        )
+        for name in modules
+    }
+    # file_patterns = re.compile(rf"^\s*module\s+{re.escape(symbol_name)}\b", re.IGNORECASE | re.MULTILINE)
+
+    for root, _, files in os.walk(dire):
+        for file in files:
+            for ext in extensions:
+                if file.endswith(ext):
+                    path = os.path.join(root, file)
+                    try:
+                        with open(
+                            path, 'r', encoding='utf-8', errors='ignore'
+                        ) as f:
+                            content = f.read()
+                            if any(module in content for module in modules):
+                                found_files.add(os.path.abspath(path))
+                    except Exception:
+                        pass  # ignora erros de leitura
+
+    return sorted(found_files)
+
+
 def process_verilog(
     cpu_name: str,
     top_module: str,
@@ -72,6 +136,7 @@ def process_verilog(
     context: int = 20,
     convert_to_verilog2005: bool = False,
     format_code: bool = False,
+    get_files_in_project: bool = False,
 ):
     vhdl_files = []
     other_files = []
@@ -191,9 +256,8 @@ def process_verilog(
     )
 
     output_path = os.path.join(BUILD_DIR, f'{cpu_name}_processed.sv')
-    
-    logging.info(f'Saving processed Verilog code to {output_path}...')
 
+    logging.info(f'Saving processed Verilog code to {output_path}...')
 
     # Salva o resultado em um único arquivo
     with open(output_path, 'w') as f:
@@ -201,7 +265,12 @@ def process_verilog(
 
     header_str = '\n'.join(header_lines)
 
-    return header_str, other_files, include_flags
+    files = []
+
+    if get_files_in_project:
+        search_files(lines, processor_path)
+
+    return header_str, other_files, include_flags, files
 
 
 def simulate_to_check(
@@ -253,7 +322,7 @@ def simulate_to_check(
         'build',
         os.path.join(INTERNAL_DIR, 'soc_main.cpp'),
         *files_list,
-        *include_flags,
+        search_files * include_flags,
         '-CFLAGS',
         '-std=c++17',
     ]
