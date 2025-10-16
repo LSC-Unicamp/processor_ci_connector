@@ -10,6 +10,7 @@ from core.interface_resolve import (
     connect_interfaces,
 )
 from core.make_wrapper import generate_instance, generate_wrapper
+from core.order_files import _order_sv_files
 
 DEFAULT_CONFIG_PATH = '/eda/processor_ci/config'
 PROCESSOR_CI_PATH = os.getenv('PROCESSOR_CI_PATH', '/eda/processor_ci')
@@ -112,6 +113,7 @@ def main() -> None:
         config_data = json.load(file)
 
     files = config_data.get('files', [])
+    print(files)
     include_dirs = config_data.get('include_dirs', [])
     top_module = config_data.get('top_module', args.processor)
 
@@ -129,12 +131,17 @@ def main() -> None:
         get_files_in_project=True,
     )
 
-    print('Arquivos: [')
-    for file in files:
-        if not 'result' in file and not 'tb' in file:
-            print(f"'{file}',")
+    files = [os.path.relpath(f, start=args.processor_path) for f in files]
+    files = set(files + config_data.get('files'))
+    files = _order_sv_files(files, repo_root=args.processor_path)
 
-    print(']')
+    #Save processed files in config json with relative paths
+    print(files)
+    config_data['files'] = files
+    with open(config_path, 'w', encoding='utf-8') as file:
+        json.dump(config_data, file, indent=4)
+ 
+
 
     logging.debug(f'Extracted header:\n{header}')
 
