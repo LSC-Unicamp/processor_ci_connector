@@ -65,7 +65,7 @@ def convert_to_verilog(cpu_name, vhdl_files, top_module, output_file):
     synthesize_to_verilog(cpu_name, output_file, top_module)
 
 
-def search_files(text_lines: str, dire: str):
+def search_files(text_lines: str, files: list[str]):
     modules = set()
     pattern = re.compile(r'(\w+)\s*(\w+)\s*\(')
     # Verifica se algum módulo/entity é definido nesse arquivo
@@ -75,7 +75,7 @@ def search_files(text_lines: str, dire: str):
     extensions = ['.sv', '.v', '.vh', '.vhd']
 
     for line in text_lines:
-        if line.strip() == '' and line.startswith('`line'):
+        if line.strip() == '' or line.startswith('`line'):
             continue
         strip = line.strip()
         out = pattern.search(strip)
@@ -107,22 +107,17 @@ def search_files(text_lines: str, dire: str):
         )
         for name in modules
     }
-    # file_patterns = re.compile(rf"^\s*module\s+{re.escape(symbol_name)}\b", re.IGNORECASE | re.MULTILINE)
 
-    for root, _, files in os.walk(dire):
-        for file in files:
-            for ext in extensions:
-                if file.endswith(ext):
-                    path = os.path.join(root, file)
-                    try:
-                        with open(
-                            path, 'r', encoding='utf-8', errors='ignore'
-                        ) as f:
-                            content = f.read()
-                            if any(module in content for module in modules):
-                                found_files.add(os.path.abspath(path))
-                    except Exception:
-                        pass  # ignora erros de leitura
+    for file_path in files:
+        try:
+            with open(
+                file_path, 'r', encoding='utf-8', errors='ignore'
+            ) as f:
+                content = f.read()
+                if any(pattern.search(content) for pattern in module_file_patterns.values()):
+                    found_files.add(os.path.abspath(file_path))
+        except Exception:
+            pass  # ignora erros de leitura
 
     return sorted(found_files)
 
@@ -170,8 +165,20 @@ def process_verilog(
         other_files.append(str(verilog_output))
 
     include_flags = []
+
     for inc_dir in include_dirs:
         inc_path = os.path.join(processor_path, inc_dir)
+
+        # get all .v and /sv files in the include directory
+        files = []
+
+        # get all first level files
+        for filename in os.listdir(inc_path):
+            if filename.endswith(('.v', '.sv', '.vh')):
+                files.append(os.path.join(inc_path, filename))
+
+        other_files.extend(files)
+
         if os.path.exists(inc_path):
             include_flags.append(f'-I{inc_path}')
         else:
@@ -268,7 +275,7 @@ def process_verilog(
     files = []
 
     if get_files_in_project:
-        search_files(lines, processor_path)
+        files = search_files(lines, other_files)
 
     return header_str, other_files, include_flags, files
 
