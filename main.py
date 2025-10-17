@@ -21,7 +21,7 @@ def build_wrapper(
     processor: str,
     context: int,
     model: str,
-    processor_path: bool,
+    processor_path: str,
     output: str,
     convert: bool,
     format: bool,
