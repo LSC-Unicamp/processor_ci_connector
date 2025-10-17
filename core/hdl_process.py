@@ -68,11 +68,13 @@ def convert_to_verilog(cpu_name, vhdl_files, top_module, output_file):
 def search_files(text_lines: str, files: list[str]):
     modules = set()
     pattern = re.compile(r'(\w+)\s*(\w+)\s*\(')
-    # Verifica se algum módulo/entity é definido nesse arquivo
-
+    
+    # Verilog/SystemVerilog module pattern
     module_pattern = re.compile(r'^\s*module\s+(\w+)\s*\(')
+    # VHDL entity pattern
+    entity_pattern = re.compile(r'^\s*entity\s+(\w+)\s+is\b', re.IGNORECASE)
 
-    extensions = ['.sv', '.v', '.vh', '.vhd']
+    extensions = ['.sv', '.v', '.vh', '.vhd', '.vhdl']
 
     for line in text_lines:
         if line.strip() == '' or line.startswith('`line'):
@@ -80,7 +82,9 @@ def search_files(text_lines: str, files: list[str]):
         strip = line.strip()
         out = pattern.search(strip)
         module_out = module_pattern.search(strip)
+        entity_out = entity_pattern.search(strip)
 
+        # Verilog/SystemVerilog module detection
         if strip.endswith('#('):
             split = strip.split(' ')
             if 'module' in split[0]:
@@ -97,16 +101,29 @@ def search_files(text_lines: str, files: list[str]):
         else:
             if module_out:
                 modules.add(module_out.group(1))
+            elif entity_out:
+                # VHDL entity detected
+                modules.add(entity_out.group(1))
             elif out and strip[-1] == '(' and not strip[0] == ')':
                 modules.add(out.group(1))
 
     found_files = set()
-    module_file_patterns = {
-        name: re.compile(
+    
+    # Check if we have any VHDL files in the file list
+    has_vhdl_files = any(f.lower().endswith(('.vhd', '.vhdl')) for f in files)
+    
+    # Create patterns based on file types present
+    hdl_file_patterns = {}
+    for name in modules:
+        # Always create Verilog/SystemVerilog module pattern
+        hdl_file_patterns[f'module_{name}'] = re.compile(
             rf'^\s*module\s+{re.escape(name)}\b', re.IGNORECASE | re.MULTILINE
         )
-        for name in modules
-    }
+        # Only create VHDL entity pattern if we have VHDL files
+        if has_vhdl_files:
+            hdl_file_patterns[f'entity_{name}'] = re.compile(
+                rf'^\s*entity\s+{re.escape(name)}\s+is\b', re.IGNORECASE | re.MULTILINE
+            )
 
     for file_path in files:
         try:
@@ -114,7 +131,7 @@ def search_files(text_lines: str, files: list[str]):
                 file_path, 'r', encoding='utf-8', errors='ignore'
             ) as f:
                 content = f.read()
-                if any(pattern.search(content) for pattern in module_file_patterns.values()):
+                if any(pattern.search(content) for pattern in hdl_file_patterns.values()):
                     found_files.add(os.path.abspath(file_path))
         except Exception:
             pass  # ignora erros de leitura

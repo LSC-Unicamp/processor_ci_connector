@@ -10,7 +10,7 @@ from core.interface_resolve import (
     connect_interfaces,
 )
 from core.make_wrapper import generate_instance, generate_wrapper
-from core.order_files import _order_sv_files
+from core.order_files import _order_sv_files, _order_vhdl_files
 
 DEFAULT_CONFIG_PATH = '/eda/processor_ci/config'
 PROCESSOR_CI_PATH = os.getenv('PROCESSOR_CI_PATH', '/eda/processor_ci')
@@ -133,7 +133,13 @@ def main() -> None:
 
     files = [os.path.relpath(f, start=args.processor_path) for f in files]
     files = set(files + config_data.get('files'))
-    files = _order_sv_files(files, repo_root=args.processor_path)
+    # check if files are verilog or vhdl
+    if any(f.endswith('.vhd') or f.endswith('.vhdl') for f in files):
+        files = [f for f in files if f.endswith('.vhd') or f.endswith('.vhdl')]
+        files = _order_vhdl_files(files, repo_root=args.processor_path)
+    else:
+        files = [f for f in files if f.endswith('.sv') or f.endswith('.v')]
+        files = _order_sv_files(files, repo_root=args.processor_path)
 
     #Save processed files in config json with relative paths
     print(files)
