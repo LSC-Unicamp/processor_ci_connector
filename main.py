@@ -16,7 +16,7 @@ DEFAULT_CONFIG_PATH = '/eda/processor_ci/config'
 PROCESSOR_CI_PATH = os.getenv('PROCESSOR_CI_PATH', '/eda/processor_ci')
 
 
-def generate_wrapper(
+def build_wrapper(
     config: str,
     processor: str,
     context: int,
@@ -233,7 +233,7 @@ def main() -> None:
 
     logging.debug('Detailed logging enabled.')
 
-    generate_wrapper(
+    build_wrapper(
         config=args.config,
         processor=args.processor,
         context=args.context,
