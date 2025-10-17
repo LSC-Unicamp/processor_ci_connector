@@ -8,6 +8,7 @@ from core.defines import KEYWORDS
 
 logger = logging.getLogger(__name__)
 
+
 def run_ghdl_import(cpu_name, vhdl_files):
     """Importar todos os arquivos VHDL com GHDL -i."""
     logger.info('Importing VHDL files with GHDL (-i)...')
@@ -67,7 +68,7 @@ def convert_to_verilog(cpu_name, vhdl_files, top_module, output_file):
 def search_files(text_lines: str, files: list[str]):
     modules = set()
     pattern = re.compile(r'(\w+)\s*(\w+)\s*\(')
-    
+
     # Verilog/SystemVerilog module pattern
     module_pattern = re.compile(r'^\s*module\s+(\w+)\s*\(')
     # VHDL entity pattern
@@ -107,10 +108,10 @@ def search_files(text_lines: str, files: list[str]):
                 modules.add(out.group(1))
 
     found_files = set()
-    
+
     # Check if we have any VHDL files in the file list
     has_vhdl_files = any(f.lower().endswith(('.vhd', '.vhdl')) for f in files)
-    
+
     # Create patterns based on file types present
     hdl_file_patterns = {}
     for name in modules:
@@ -121,16 +122,18 @@ def search_files(text_lines: str, files: list[str]):
         # Only create VHDL entity pattern if we have VHDL files
         if has_vhdl_files:
             hdl_file_patterns[f'entity_{name}'] = re.compile(
-                rf'^\s*entity\s+{re.escape(name)}\s+is\b', re.IGNORECASE | re.MULTILINE
+                rf'^\s*entity\s+{re.escape(name)}\s+is\b',
+                re.IGNORECASE | re.MULTILINE,
             )
 
     for file_path in files:
         try:
-            with open(
-                file_path, 'r', encoding='utf-8', errors='ignore'
-            ) as f:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
-                if any(pattern.search(content) for pattern in hdl_file_patterns.values()):
+                if any(
+                    pattern.search(content)
+                    for pattern in hdl_file_patterns.values()
+                ):
                     found_files.add(os.path.abspath(file_path))
         except Exception:
             pass  # ignora erros de leitura

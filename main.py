@@ -16,6 +16,134 @@ DEFAULT_CONFIG_PATH = '/eda/processor_ci/config'
 PROCESSOR_CI_PATH = os.getenv('PROCESSOR_CI_PATH', '/eda/processor_ci')
 
 
+def generate_wrapper(
+    config: str,
+    processor: str,
+    context: int,
+    model: str,
+    processor_path: bool,
+    output: str,
+    convert: bool,
+    format: bool,
+) -> None:
+    logging.info('Reading processor configuration...')
+
+    config_path = os.path.join(config, f'{processor}.json')
+    config_data = {}
+    with open(config_path, 'r', encoding='utf-8') as file:
+        config_data = json.load(file)
+
+    files = config_data.get('files', [])
+    include_dirs = config_data.get('include_dirs', [])
+    top_module = config_data.get('top_module', processor)
+
+    logging.info('Processing HDL code...')
+
+    header, other_files, include_flags, files = process_verilog(
+        processor,
+        top_module,
+        files,
+        include_dirs,
+        processor_path,
+        context=context,
+        convert_to_verilog2005=convert,
+        format_code=format,
+        get_files_in_project=True,
+    )
+
+    files = [os.path.relpath(f, start=processor_path) for f in files]
+    files = set(files + config_data.get('files'))
+    # check if files are verilog or vhdl
+    if any(f.endswith('.vhd') or f.endswith('.vhdl') for f in files):
+        files = [f for f in files if f.endswith('.vhd') or f.endswith('.vhdl')]
+        files = _order_vhdl_files(files, repo_root=processor_path)
+    else:
+        files = [f for f in files if f.endswith('.sv') or f.endswith('.v')]
+        files = _order_sv_files(files, repo_root=processor_path)
+
+    # Save processed files in config json with relative paths
+    config_data['files'] = files
+    with open(config_path, 'w', encoding='utf-8') as file:
+        json.dump(config_data, file, indent=4)
+
+    logging.debug(f'Extracted header:\n{header}')
+
+    interface_and_ports = None
+
+    logging.info('Extracting interfaces and memory ports...')
+
+    ok = False
+    tentativas = 0
+    # Tenta 3 vezes obter um json valido
+    while not ok and tentativas < 3:
+        tentativas += 1
+        logging.debug(f'Attempt {tentativas} of 3...')
+        ok, interface_and_ports = extract_interface_and_memory_ports(
+            header, model
+        )
+
+    if tentativas == 3 and not ok:
+        logging.error('Error parsing JSON')
+        sys.exit(1)
+
+    logging.info(f'Detected interface: {interface_and_ports}')
+
+    logging.info('Connecting interfaces...')
+
+    tentativas = 0
+    connections = None
+
+    while connections is None and tentativas < 3:
+        tentativas += 1
+        logging.debug(f'Attempt {tentativas} of 3...')
+        connections = connect_interfaces(interface_and_ports, header, model)
+
+    if tentativas == 3 and connections is None:
+        logging.error('Error parsing JSON')
+        sys.exit(1)
+
+    logging.debug(f'Interface connections: {connections}')
+
+    second_memory = interface_and_ports.get('memory_interface', '') == 'Dual'
+    use_adapter = interface_and_ports.get('bus_type', '') not in [
+        'Wishbone',
+        'Custom',
+        'Avalon',
+    ]
+
+    logging.info('Generating instance...')
+
+    instance, assign_list, create_signals = generate_instance(
+        header,
+        connections,
+        second_memory=second_memory,
+        instance_name='Processor',
+        use_adapter=use_adapter,
+    )
+
+    logging.info('Generating wrapper...')
+
+    generate_wrapper(
+        processor,
+        instance,
+        interface_and_ports['bus_type'],
+        second_memory,
+        output,
+        assign_list,
+        create_signals,
+    )
+
+    logging.info('Starting simulation for verification...')
+
+    simulate_to_check(
+        processor,
+        other_files,
+        include_flags,
+        output,
+        second_memory=second_memory,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description='Processor CI Conector',
@@ -105,123 +233,15 @@ def main() -> None:
 
     logging.debug('Detailed logging enabled.')
 
-    logging.info('Reading processor configuration...')
-
-    config_path = os.path.join(args.config, f'{args.processor}.json')
-    config_data = {}
-    with open(config_path, 'r', encoding='utf-8') as file:
-        config_data = json.load(file)
-
-    files = config_data.get('files', [])
-    include_dirs = config_data.get('include_dirs', [])
-    top_module = config_data.get('top_module', args.processor)
-
-    logging.info('Processing HDL code...')
-
-    header, other_files, include_flags, files = process_verilog(
-        args.processor,
-        top_module,
-        files,
-        include_dirs,
-        args.processor_path,
-        context=args.context,
-        convert_to_verilog2005=args.convert_to_verilog2005,
-        format_code=args.format_code,
-        get_files_in_project=True,
-    )
-
-    files = [os.path.relpath(f, start=args.processor_path) for f in files]
-    files = set(files + config_data.get('files'))
-    # check if files are verilog or vhdl
-    if any(f.endswith('.vhd') or f.endswith('.vhdl') for f in files):
-        files = [f for f in files if f.endswith('.vhd') or f.endswith('.vhdl')]
-        files = _order_vhdl_files(files, repo_root=args.processor_path)
-    else:
-        files = [f for f in files if f.endswith('.sv') or f.endswith('.v')]
-        files = _order_sv_files(files, repo_root=args.processor_path)
-
-    #Save processed files in config json with relative paths
-    config_data['files'] = files
-    with open(config_path, 'w', encoding='utf-8') as file:
-        json.dump(config_data, file, indent=4)
-
-    logging.debug(f'Extracted header:\n{header}')
-
-    interface_and_ports = None
-
-    logging.info('Extracting interfaces and memory ports...')
-
-    ok = False
-    tentativas = 0
-    # Tenta 3 vezes obter um json valido
-    while not ok and tentativas < 3:
-        tentativas += 1
-        logging.debug(f'Attempt {tentativas} of 3...')
-        ok, interface_and_ports = extract_interface_and_memory_ports(
-            header, args.model
-        )
-
-    if tentativas == 3 and not ok:
-        logging.error('Error parsing JSON')
-        sys.exit(1)
-
-    logging.info(f'Detected interface: {interface_and_ports}')
-
-    logging.info('Connecting interfaces...')
-
-    tentativas = 0
-    connections = None
-
-    while connections is None and tentativas < 3:
-        tentativas += 1
-        logging.debug(f'Attempt {tentativas} of 3...')
-        connections = connect_interfaces(
-            interface_and_ports, header, args.model
-        )
-
-    if tentativas == 3 and connections is None:
-        logging.error('Error parsing JSON')
-        sys.exit(1)
-
-    logging.debug(f'Interface connections: {connections}')
-
-    second_memory = interface_and_ports.get('memory_interface', '') == 'Dual'
-    use_adapter = interface_and_ports.get('bus_type', '') not in [
-        'Wishbone',
-        'Custom',
-        'Avalon',
-    ]
-
-    logging.info('Generating instance...')
-
-    instance, assign_list, create_signals = generate_instance(
-        header,
-        connections,
-        second_memory=second_memory,
-        instance_name='Processor',
-        use_adapter=use_adapter,
-    )
-
-    logging.info('Generating wrapper...')
-
     generate_wrapper(
-        args.processor,
-        instance,
-        interface_and_ports['bus_type'],
-        second_memory,
-        args.output,
-        assign_list,
-        create_signals,
-    )
-
-    logging.info('Starting simulation for verification...')
-
-    simulate_to_check(
-        args.processor,
-        other_files,
-        include_flags,
-        args.output,
-        second_memory=second_memory,
+        config=args.config,
+        processor=args.processor,
+        context=args.context,
+        model=args.model,
+        processor_path=args.processor_path,
+        output=args.output,
+        convert=args.convert_to_verilog2005,
+        format=args.format_code,
     )
 
 
