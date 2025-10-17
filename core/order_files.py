@@ -25,6 +25,7 @@ def _is_vhdl_pkg_file(path: str) -> bool:
         or "package" in base
     )
 
+
 def _is_pkg_file(path: str) -> bool:
     p = path.lower()
     base = os.path.basename(p)
@@ -251,18 +252,18 @@ def _order_sv_files(files: List[str], repo_root: str | None = None) -> List[str]
 
 def _order_vhdl_files(files: List[str], repo_root: str | None = None) -> List[str]:
     """
-    Order VHDL files based on dependencies.
+    Order VHDL files for GHDL compilation compatibility.
     
-    VHDL dependency rules:
-    1. Packages must come before entities/architectures that use them
-    2. Entities must come before architectures that implement them
-    3. Entity/architecture pairs must come before entities that instantiate them
-    4. Library 'use' clauses determine package dependencies
+    GHDL requires strict compilation order:
+    1. Package declarations must be compiled before any file that uses them
+    2. Entity declarations must be compiled before any file that instantiates them
+    3. Architecture bodies can be compiled after their corresponding entity
     
-    The result should have:
-    - Package files first
-    - Lower-level entities/architectures next
-    - Top entity/architecture last
+    The result will be ordered such that:
+    - Package files come first
+    - Entities with no dependencies come next
+    - Entities that instantiate others come after their dependencies
+    - Top-level entity (never instantiated) comes last
     """
     if not repo_root:
         # Simple fallback: packages first, then by original order
@@ -270,9 +271,11 @@ def _order_vhdl_files(files: List[str], repo_root: str | None = None) -> List[st
         indexed.sort(key=lambda t: (0 if _is_vhdl_pkg_file(t[1]) else 1, t[0]))
         return [f for _i, f in indexed]
 
-    logger.debug(f"Ordering {len(files)} VHDL files with repo_root: {repo_root}")
+    logger.info(f"Ordering {len(files)} VHDL files for GHDL compilation compatibility")
 
     # VHDL patterns (case-insensitive)
+    # Library declaration: library <name>;
+    library_decl_re = re.compile(r"^\s*library\s+(\w+)\s*;", re.MULTILINE | re.IGNORECASE)
     # Package declaration: package <name> is
     pkg_decl_re = re.compile(r"^\s*package\s+(\w+)\s+is\b", re.MULTILINE | re.IGNORECASE)
     # Entity declaration: entity <name> is
@@ -280,12 +283,12 @@ def _order_vhdl_files(files: List[str], repo_root: str | None = None) -> List[st
     # Architecture declaration: architecture <arch_name> of <entity_name> is
     arch_decl_re = re.compile(r"^\s*architecture\s+\w+\s+of\s+(\w+)\s+is\b", re.MULTILINE | re.IGNORECASE)
     # Use clause: use <library>.<package>.<item> or use <library>.<package>.all
-    use_clause_re = re.compile(r"^\s*use\s+(\w+)\.(\w+)\.", re.MULTILINE | re.IGNORECASE)
+    use_clause_re = re.compile(r"^\s*use\s+(\w+)\.(\w+)(?:\.(\w+))?", re.MULTILINE | re.IGNORECASE)
     # Component declaration: component <name> is (for instantiation detection)
     component_re = re.compile(r"^\s*component\s+(\w+)\b", re.MULTILINE | re.IGNORECASE)
     # Direct entity instantiation: <instance_name> : entity <library>.<entity_name>
     entity_inst_re = re.compile(r"^\s*\w+\s*:\s*entity\s+(\w+)\.(\w+)", re.MULTILINE | re.IGNORECASE)
-    # Component instantiation: <instance_name> : <component_name>
+    # Component instantiation: <instance_name> : <component_name> (port|generic) map
     comp_inst_re = re.compile(r"^\s*\w+\s*:\s*(\w+)\s+(?:port|generic)\s+map", re.MULTILINE | re.IGNORECASE)
 
     def _read(file_path: str) -> str:
@@ -301,23 +304,36 @@ def _order_vhdl_files(files: List[str], repo_root: str | None = None) -> List[st
             return ""
 
     # Data structures
-    file_to_packages: Dict[str, Set[str]] = {f: set() for f in files}  # packages used by file
-    file_to_entities_used: Dict[str, Set[str]] = {f: set() for f in files}  # entities instantiated
+    file_to_packages: Dict[str, Set[str]] = {f: set() for f in files}  # packages used by file (library.package)
+    file_to_entities_used: Dict[str, Set[str]] = {f: set() for f in files}  # entities instantiated (library.entity)
+    file_to_libraries: Dict[str, Set[str]] = {f: set() for f in files}  # libraries declared in file
     pkg_to_file: Dict[str, str] = {}  # package name -> file that declares it
     entity_to_file: Dict[str, str] = {}  # entity name -> file that declares it
     file_to_declared_entity: Dict[str, str] = {}  # file -> entity name declared in it
+    file_to_declared_package: Dict[str, str] = {}  # file -> package name declared in it
+    
+    # Track custom libraries (not ieee, std, work)
+    custom_libraries: Set[str] = set()
 
-    # First pass: detect package and entity declarations
+    # First pass: detect package and entity declarations, and library declarations
     for f in files:
         text = _read(f)
         if not text:
             logger.debug(f"Could not read file: {f}")
             continue
 
+        # Find library declarations (to detect custom libraries)
+        for m in library_decl_re.finditer(text):
+            lib_name = m.group(1).lower()
+            if lib_name not in ['ieee', 'std', 'work']:
+                custom_libraries.add(lib_name)
+                file_to_libraries[f].add(lib_name)
+
         # Find package declarations
         for m in pkg_decl_re.finditer(text):
             pkg_name = m.group(1).lower()  # VHDL is case-insensitive
             pkg_to_file[pkg_name] = f
+            file_to_declared_package[f] = pkg_name
             logger.debug(f"Found package '{m.group(1)}' in {os.path.basename(f)}")
             break  # Usually one package per file
 
@@ -331,6 +347,8 @@ def _order_vhdl_files(files: List[str], repo_root: str | None = None) -> List[st
 
     logger.debug(f"Detected {len(pkg_to_file)} packages: {list(pkg_to_file.keys())}")
     logger.debug(f"Detected {len(entity_to_file)} entities: {list(entity_to_file.keys())}")
+    if custom_libraries:
+        logger.info(f"Detected custom libraries: {list(custom_libraries)}")
 
     # Second pass: detect dependencies (use clauses, instantiations)
     for f in files:
@@ -347,22 +365,23 @@ def _order_vhdl_files(files: List[str], repo_root: str | None = None) -> List[st
             if library in ['ieee', 'std']:
                 continue
             
-            # If it's from 'work' library or matches a known package, track it
-            if library == 'work' and package in pkg_to_file:
-                file_to_packages[f].add(package)
-                logger.debug(f"{os.path.basename(f)} uses package '{package}'")
-            elif package in pkg_to_file:
-                file_to_packages[f].add(package)
-                logger.debug(f"{os.path.basename(f)} uses package '{package}'")
+            # Track packages from work library or custom libraries
+            if package in pkg_to_file:
+                # Store as "library.package" for better tracking
+                file_to_packages[f].add(f"{library}.{package}")
 
         # Find entity instantiations (direct entity instantiation)
         for m in entity_inst_re.finditer(text):
             library = m.group(1).lower()
             entity = m.group(2).lower()
             
-            if library == 'work' and entity in entity_to_file:
+            # Skip standard libraries
+            if library in ['ieee', 'std']:
+                continue
+            
+            # Track entities from work or custom libraries
+            if entity in entity_to_file:
                 file_to_entities_used[f].add(entity)
-                logger.debug(f"{os.path.basename(f)} instantiates entity '{entity}' (direct)")
 
         # Find component instantiations
         # First collect component declarations in this file
@@ -373,10 +392,15 @@ def _order_vhdl_files(files: List[str], repo_root: str | None = None) -> List[st
         # Then find component instantiations
         for m in comp_inst_re.finditer(text):
             comp_name = m.group(1).lower()
-            # If this component matches a known entity (and wasn't declared in this file)
+            logger.debug(f"{os.path.basename(f)}: Found instantiation of '{comp_name}'")
+            # If this component matches a known entity (and wasn't declared in this file as a component)
             if comp_name in entity_to_file and comp_name not in components_in_file:
                 file_to_entities_used[f].add(comp_name)
-                logger.debug(f"{os.path.basename(f)} instantiates entity '{comp_name}' (component)")
+                logger.debug(f"  -> {os.path.basename(f)} uses entity '{comp_name}' from {os.path.basename(entity_to_file[comp_name])}")
+            elif comp_name in components_in_file:
+                logger.debug(f"  -> Skipped: '{comp_name}' is a component declared in this file")
+            else:
+                logger.debug(f"  -> Skipped: '{comp_name}' not found in entity_to_file dict")
 
     # Identify which entities are instantiated (not top-level)
     instantiated_entities = set()
@@ -388,32 +412,41 @@ def _order_vhdl_files(files: List[str], repo_root: str | None = None) -> List[st
     top_entity_files = {entity_to_file[e] for e in top_entities}
     
     if top_entities:
-        logger.debug(f"Top entities (never instantiated): {top_entities}")
+        logger.info(f"Top-level entities (not instantiated): {list(top_entities)}")
 
-    # Build dependency graph
+    # Build dependency graph for GHDL compilation order
+    # In GHDL: if file A depends on file B, then B must be compiled BEFORE A
     nodes = list(files)
     adj: Dict[str, Set[str]] = {f: set() for f in nodes}
     indeg: Dict[str, int] = {f: 0 for f in nodes}
 
-    # Package dependency edges: package file → files that use it
+    # Package dependency edges: package file must come BEFORE files that use it
     for f, packages in file_to_packages.items():
-        for pkg in packages:
+        for lib_pkg in packages:
+            # Extract package name from "library.package"
+            if '.' in lib_pkg:
+                _, pkg = lib_pkg.split('.', 1)
+            else:
+                pkg = lib_pkg
+            
             provider = pkg_to_file.get(pkg)
             if provider and provider != f:
+                # provider → f means f depends on provider
+                # So provider must be compiled first
                 if f not in adj[provider]:
                     adj[provider].add(f)
                     indeg[f] += 1
-                    logger.debug(f"Package dependency: {os.path.basename(provider)} → {os.path.basename(f)}")
 
-    # Entity instantiation edges: instantiated entity file → instantiating file
+    # Entity instantiation edges: instantiated entity must come BEFORE instantiating entity
     for f, entities in file_to_entities_used.items():
         for entity in entities:
             provider = entity_to_file.get(entity)
             if provider and provider != f:
+                # provider → f means f instantiates provider
+                # So provider must be compiled first
                 if f not in adj[provider]:
                     adj[provider].add(f)
                     indeg[f] += 1
-                    logger.debug(f"Entity dependency: {os.path.basename(provider)} → {os.path.basename(f)}")
 
     # Topological sort with priority: packages (0) < regular entities (1) < top entities (2)
     def get_priority(f):
@@ -442,8 +475,11 @@ def _order_vhdl_files(files: List[str], repo_root: str | None = None) -> List[st
 
     if len(ordered) != len(nodes):
         remaining = [n for n in nodes if n not in ordered]
-        logger.warning(f"VHDL topological sort incomplete: {len(remaining)} files have circular dependencies")
+        logger.warning(f"Circular dependencies detected in {len(remaining)} VHDL files")
+        logger.warning(f"Files with circular dependencies: {[os.path.basename(f) for f in remaining]}")
+        # Add remaining files at the end, sorted by original order
         ordered.extend(sorted(remaining, key=lambda x: index_map[x]))
 
-    logger.debug(f"VHDL file ordering complete: {len(ordered)} files ordered")
+    logger.info(f"VHDL file ordering complete: {len(ordered)} files")
+    logger.info(f"Compilation order: {[os.path.basename(f) for f in ordered]}")
     return ordered

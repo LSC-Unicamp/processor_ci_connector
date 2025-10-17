@@ -8,7 +8,6 @@ from core.defines import KEYWORDS
 
 logger = logging.getLogger(__name__)
 
-
 def run_ghdl_import(cpu_name, vhdl_files):
     """Importar todos os arquivos VHDL com GHDL -i."""
     logger.info('Importing VHDL files with GHDL (-i)...')
