@@ -345,7 +345,7 @@ def simulate_to_check(
         'build',
         os.path.join(INTERNAL_DIR, 'soc_main.cpp'),
         *files_list,
-        search_files * include_flags,
+        *include_flags,
         '-CFLAGS',
         '-std=c++17',
     ]
